@@ -1,0 +1,134 @@
+.auth-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+}
+
+.auth-left {
+  flex: 0 0 420px;
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem;
+  color: #fff;
+}
+
+.auth-logo {
+  font-family: "Fraunces", serif;
+  font-size: 2rem;
+  font-weight: 600;
+  color: #e8d5b7;
+  margin-bottom: 0.5rem;
+}
+
+.auth-tagline {
+  font-size: 0.85rem;
+  color: #9999bb;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-art {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.auth-art-cell {
+  height: 40px;
+  border-radius: 6px;
+  background: #2a2a4e;
+}
+
+.auth-art-cell.lit {
+  background: #e8d5b7;
+  opacity: 0.7;
+}
+
+.auth-side-text {
+  margin-top: 2rem;
+  font-size: 0.8rem;
+  color: #9999bb;
+  line-height: 1.6;
+}
+
+.auth-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.auth-box {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-box h2 {
+  font-family: "Fraunces", serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.auth-box p {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.auth-error {
+  background: #fff1f1;
+  border: 1px solid #fcc;
+  color: #c33;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.auth-divider {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.8rem;
+  margin: 1.2rem 0;
+  position: relative;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 42%;
+  height: 1px;
+  background: #e5e2db;
+}
+
+.auth-divider::before {
+  left: 0;
+}
+
+.auth-divider::after {
+  right: 0;
+}
+
+.btn-oauth {
+  width: 100%;
+  padding: 11px;
+  background: #fff;
+  border: 1.5px solid #e0ddd6;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #333;
+}
+
+@media (max-width: 900px) {
+  .auth-left {
+    display: none;
+  }
+}

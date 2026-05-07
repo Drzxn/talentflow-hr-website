@@ -1,0 +1,80 @@
+.report-filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.reports-table {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #f0ede8;
+  overflow: hidden;
+}
+
+.export-btn {
+  padding: 9px 18px;
+  background: #1a1a2e;
+  color: #e8d5b7;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.export-btn:hover {
+  background: #2a2a4e;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table-scroll table {
+  min-width: 900px;
+}
+
+@media (max-width: 900px) {
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    width: 60px;
+  }
+
+  .sidebar-logo {
+    padding: 1rem;
+  }
+
+  .sidebar-logo span,
+  .sidebar-logo .tf-text {
+    display: none;
+  }
+
+  .nav-item {
+    padding: 12px;
+    justify-content: center;
+  }
+
+  .nav-item span:not(.nav-icon) {
+    display: none;
+  }
+
+  .main-area {
+    margin-left: 60px;
+  }
+
+  .header {
+    padding: 0 1rem;
+  }
+
+  .profile-name {
+    display: none;
+  }
+}

@@ -1,0 +1,102 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap");
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+  background: #f7f6f2;
+  color: #1a1a1a;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button,
+input,
+select {
+  font-family: "DM Sans", sans-serif;
+}
+
+button {
+  cursor: pointer;
+}
+
+.page {
+  padding: 2rem;
+  flex: 1;
+}
+
+.page-title {
+  font-family: "Fraunces", serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.page-subtitle {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.2rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #e0ddd6;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #1a1a2e;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: #1a1a2e;
+  color: #e8d5b7;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background: #2a2a4e;
+}
+
+.empty-row {
+  text-align: center;
+  color: #aaa;
+  padding: 2rem;
+}
+
+.settings-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #f0ede8;
+  padding: 1.5rem;
+  max-width: 500px;
+}
+
+.settings-card h3 {
+  margin-bottom: 1.2rem;
+}

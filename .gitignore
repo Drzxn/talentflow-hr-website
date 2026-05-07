@@ -1,0 +1,12 @@
+
+backend/service-account.json
+
+ngrok.exe
+
+backend/prisma/dev.db
+
+.env
+
+backend/.env
+
+frontend/.env
