@@ -16,7 +16,7 @@ router.get("/dashboard", async (req, res) => {
     }
 
     const auth = new google.auth.GoogleAuth({
-      keyFile: path.join(process.cwd(), "service-account.json"),
+      keyFile: "/etc/secrets/service-account.json",
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
 
