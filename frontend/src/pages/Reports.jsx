@@ -145,7 +145,7 @@ export default function Reports() {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/api/sheets/dashboard");
+      const res = await fetch("https://talentflow-hr-website-1jga.onrender.com/api/sheets/dashboard");
       const result = await res.json();
 
       setJobs(result.data || []);
