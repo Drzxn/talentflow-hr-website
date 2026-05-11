@@ -60,12 +60,12 @@ export default function HospitalityDashboard() {
   const getEntity = (item) =>
     String(
       item["Entity"] ||
-        item["Entities"] ||
-        item["Project"] ||
-        item["Property"] ||
-        item["Hotel"] ||
-        item["Unit"] ||
-        "Unknown"
+      item["Entities"] ||
+      item["Project"] ||
+      item["Property"] ||
+      item["Hotel"] ||
+      item["Unit"] ||
+      "Unknown"
     ).trim();
 
   const getFunction = (item) =>
@@ -74,7 +74,7 @@ export default function HospitalityDashboard() {
   const loadHospitality = async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/hospitality/dashboard");
+      const res = await fetch("https://talentflow-hr-website-1jga.onrender.com");
       const result = await res.json();
       setRows(Array.isArray(result.data) ? result.data : []);
     } catch (error) {
