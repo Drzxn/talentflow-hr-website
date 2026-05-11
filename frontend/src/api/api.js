@@ -2,8 +2,25 @@ const API_URL =
   import.meta.env.VITE_API_URL ||
   "https://talentflow-hr-website.onrender.com";
 
-const res = await fetch(`${API_URL}/api/sheets/dashboard`);
+export async function getDashboardData() {
+  try {
+    const res = await fetch(`${API_URL}/api/sheets/dashboard`);
 
-const data = await res.json();
+    if (!res.ok) {
+      throw new Error("Failed to fetch dashboard data");
+    }
 
-console.log(data.data);
+    const data = await res.json();
+
+    console.log("Dashboard Data:", data);
+
+    return data;
+  } catch (error) {
+    console.error("DASHBOARD ERROR:", error);
+
+    return {
+      success: false,
+      data: [],
+    };
+  }
+}
