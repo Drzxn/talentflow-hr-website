@@ -21,10 +21,14 @@ ChartJS.register(
   Legend
 );
 
+const DEFAULT_ENTITIES = ["NB Club Bellezea", "Chalukya Samrat"];
+const DEFAULT_FUNCTIONS = ["HR"];
+
 export default function HospitalityDashboard() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [selectedEntity, setSelectedEntity] = useState("All");
   const [selectedFunction, setSelectedFunction] = useState("All");
   const [timeFilter, setTimeFilter] = useState("all");
   const [customFrom, setCustomFrom] = useState("");
@@ -53,6 +57,20 @@ export default function HospitalityDashboard() {
     return null;
   };
 
+  const getEntity = (item) =>
+    String(
+      item["Entity"] ||
+        item["Entities"] ||
+        item["Project"] ||
+        item["Property"] ||
+        item["Hotel"] ||
+        item["Unit"] ||
+        "Unknown"
+    ).trim();
+
+  const getFunction = (item) =>
+    String(item["Function"] || item["Department"] || "Unknown").trim();
+
   const loadHospitality = async () => {
     try {
       setLoading(true);
@@ -71,23 +89,25 @@ export default function HospitalityDashboard() {
     loadHospitality();
   }, []);
 
-  const functions = useMemo(() => {
-    const list = rows
-      .map((item) =>
-        String(item["Function"] || item["Department"] || "Unknown").trim()
-      )
-      .filter(Boolean);
+  const entities = useMemo(() => {
+    const sheetEntities = rows.map(getEntity).filter(Boolean);
+    return ["All", ...Array.from(new Set([...DEFAULT_ENTITIES, ...sheetEntities])).sort()];
+  }, [rows]);
 
-    return ["All", ...Array.from(new Set(list)).sort()];
+  const functions = useMemo(() => {
+    const sheetFunctions = rows.map(getFunction).filter(Boolean);
+    return ["All", ...Array.from(new Set([...DEFAULT_FUNCTIONS, ...sheetFunctions])).sort()];
   }, [rows]);
 
   const filteredRows = useMemo(() => {
     const now = new Date();
 
     return rows.filter((item) => {
-      const fn = String(
-        item["Function"] || item["Department"] || "Unknown"
-      ).trim();
+      const entity = getEntity(item);
+      const fn = getFunction(item);
+
+      const entityMatch =
+        selectedEntity === "All" || entity === selectedEntity;
 
       const functionMatch =
         selectedFunction === "All" || fn === selectedFunction;
@@ -102,7 +122,6 @@ export default function HospitalityDashboard() {
         item["Target Date"];
 
       const rowDate = parseDate(dateValue);
-
       let timeMatch = true;
 
       if (timeFilter !== "all") {
@@ -126,9 +145,7 @@ export default function HospitalityDashboard() {
           const fromDate = customFrom ? new Date(customFrom) : null;
           const toDate = customTo ? new Date(customTo) : null;
 
-          if (toDate) {
-            toDate.setHours(23, 59, 59, 999);
-          }
+          if (toDate) toDate.setHours(23, 59, 59, 999);
 
           if (fromDate && rowDate < fromDate) timeMatch = false;
           if (toDate && rowDate > toDate) timeMatch = false;
@@ -137,9 +154,9 @@ export default function HospitalityDashboard() {
         }
       }
 
-      return functionMatch && timeMatch;
+      return entityMatch && functionMatch && timeMatch;
     });
-  }, [rows, selectedFunction, timeFilter, customFrom, customTo]);
+  }, [rows, selectedEntity, selectedFunction, timeFilter, customFrom, customTo]);
 
   const summary = useMemo(() => {
     return filteredRows.reduce(
@@ -182,10 +199,7 @@ export default function HospitalityDashboard() {
     const map = {};
 
     filteredRows.forEach((item) => {
-      const fn = String(
-        item["Function"] || item["Department"] || "Unknown"
-      ).trim();
-
+      const fn = getFunction(item);
       map[fn] = (map[fn] || 0) + toNumber(item["Total Positions"]);
     });
 
@@ -289,12 +303,24 @@ export default function HospitalityDashboard() {
       <div style={styles.filterBar}>
         <select
           style={styles.select}
+          value={selectedEntity}
+          onChange={(e) => setSelectedEntity(e.target.value)}
+        >
+          {entities.map((entity) => (
+            <option key={entity} value={entity}>
+              {entity === "All" ? "All Entities" : entity}
+            </option>
+          ))}
+        </select>
+
+        <select
+          style={styles.select}
           value={selectedFunction}
           onChange={(e) => setSelectedFunction(e.target.value)}
         >
           {functions.map((fn) => (
             <option key={fn} value={fn}>
-              {fn}
+              {fn === "All" ? "All Functions" : fn}
             </option>
           ))}
         </select>
@@ -392,7 +418,7 @@ const styles = {
 
   select: {
     height: "42px",
-    minWidth: "180px",
+    minWidth: "190px",
     padding: "0 12px",
     borderRadius: "12px",
     border: "1px solid #d1d5db",

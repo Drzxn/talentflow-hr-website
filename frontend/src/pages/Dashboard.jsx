@@ -33,7 +33,6 @@ const valueLabelPlugin = {
 
         if (chart.config.type === "bar") {
           const position = element.tooltipPosition();
-
           ctx.fillStyle = "#111827";
           ctx.fillText(value, position.x, position.y - 10);
         }
@@ -73,6 +72,15 @@ ChartJS.register(
   Legend,
   valueLabelPlugin
 );
+
+const ENTITIES = [
+  "All Entities",
+  "Nambiar Ensemble residential Projects LLP",
+  "Sentries Construction LLP",
+  "Nambiar Builders Private Limited",
+  "Nambiar Builders LLP",
+  "Nambiar Enterprises LLP",
+];
 
 const FUNCTIONS = [
   "All Functions",
@@ -114,6 +122,7 @@ const TIME_FILTERS = [
 ];
 
 export default function Dashboard() {
+  const [selectedEntity, setSelectedEntity] = useState("All Entities");
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
   const [selectedTime, setSelectedTime] = useState("All Time");
   const [customFrom, setCustomFrom] = useState("");
@@ -124,6 +133,19 @@ export default function Dashboard() {
   const toNumber = (value) => {
     const num = Number(value || 0);
     return Number.isNaN(num) ? 0 : num;
+  };
+
+  const cleanText = (value) => String(value || "").trim();
+
+  const getEntity = (item) => {
+    return (
+      cleanText(item["Entity"]) ||
+      cleanText(item["Entities"]) ||
+      cleanText(item["Company"]) ||
+      cleanText(item["Company Name"]) ||
+      cleanText(item["Business Entity"]) ||
+      "Unknown"
+    );
   };
 
   const parseDate = (value) => {
@@ -223,7 +245,6 @@ export default function Dashboard() {
     if (selectedTime === "90 Days") {
       from = startOfDay(today);
       from.setDate(from.getDate() - 90);
-
       to = endOfDay(today);
     }
 
@@ -265,6 +286,10 @@ export default function Dashboard() {
   const filteredJobs = useMemo(() => {
     let rows = jobs.filter((item) => item["Sl No."] !== "Total");
 
+    if (selectedEntity !== "All Entities") {
+      rows = rows.filter((item) => getEntity(item) === selectedEntity);
+    }
+
     if (selectedFunction !== "All Functions") {
       rows = rows.filter(
         (item) => String(item["Function"] || "").trim() === selectedFunction
@@ -272,7 +297,14 @@ export default function Dashboard() {
     }
 
     return rows.filter(isInsideTimeFilter);
-  }, [jobs, selectedFunction, selectedTime, customFrom, customTo]);
+  }, [
+    jobs,
+    selectedEntity,
+    selectedFunction,
+    selectedTime,
+    customFrom,
+    customTo,
+  ]);
 
   const summary = useMemo(() => {
     return filteredJobs.reduce(
@@ -340,6 +372,17 @@ export default function Dashboard() {
       .slice(0, 10);
   }, [filteredJobs]);
 
+  const entitySummary = useMemo(() => {
+    const map = {};
+
+    filteredJobs.forEach((item) => {
+      const entity = getEntity(item);
+      map[entity] = (map[entity] || 0) + toNumber(item["Total Positions"]);
+    });
+
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [filteredJobs]);
+
   const barData = {
     labels: functionSummary.map(([name]) => name),
 
@@ -347,8 +390,22 @@ export default function Dashboard() {
       {
         label: "Total Positions",
         data: functionSummary.map(([, value]) => value),
-        backgroundColor: "#6c63ff",
-        hoverBackgroundColor: "#6c63ff",
+        backgroundColor: "#16a34a",
+        hoverBackgroundColor: "#16a34a",
+        borderRadius: 8,
+      },
+    ],
+  };
+
+  const entityBarData = {
+    labels: entitySummary.map(([name]) => name),
+
+    datasets: [
+      {
+        label: "Entity Positions",
+        data: entitySummary.map(([, value]) => value),
+        backgroundColor: "#22c55e",
+        hoverBackgroundColor: "#22c55e",
         borderRadius: 8,
       },
     ],
@@ -470,6 +527,38 @@ export default function Dashboard() {
     },
   };
 
+  const entityBarOptions = {
+    ...barOptions,
+
+    indexAxis: "y",
+
+    scales: {
+      x: {
+        beginAtZero: true,
+        grace: "15%",
+
+        ticks: {
+          precision: 0,
+          font: {
+            size: 10,
+          },
+        },
+      },
+
+      y: {
+        ticks: {
+          font: {
+            size: 10,
+          },
+        },
+
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
+
   const doughnutOptions = {
     ...commonOptions,
 
@@ -497,13 +586,25 @@ export default function Dashboard() {
 
   return (
     <>
-      <h1 className="page-title">Dashboard</h1>
+      <h1 className="page-title">NB Dashboard</h1>
 
       <p className="page-subtitle">
         Live recruitment dashboard connected with Google Sheets.
       </p>
 
       <div className="filter-bar">
+        <select
+          className="filter-select"
+          value={selectedEntity}
+          onChange={(e) => setSelectedEntity(e.target.value)}
+        >
+          {ENTITIES.map((entity) => (
+            <option key={entity} value={entity}>
+              {entity}
+            </option>
+          ))}
+        </select>
+
         <select
           className="filter-select"
           value={selectedFunction}
@@ -584,6 +685,14 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          <div style={styles.entityChartCard}>
+            <h3 style={styles.chartTitle}>Positions by Entity</h3>
+
+            <div style={styles.entityChartBox}>
+              <Bar data={entityBarData} options={entityBarOptions} />
+            </div>
+          </div>
         </>
       )}
     </>
@@ -604,8 +713,8 @@ const styles = {
     borderRadius: "24px",
     padding: "20px",
     height: "340px",
-    boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
-    border: "1px solid #ececec",
+    boxShadow: "0 4px 18px rgba(34,197,94,0.10)",
+    border: "1px solid #bbf7d0",
     boxSizing: "border-box",
   },
 
@@ -614,19 +723,30 @@ const styles = {
     borderRadius: "24px",
     padding: "20px",
     height: "340px",
-    boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
-    border: "1px solid #ececec",
+    boxShadow: "0 4px 18px rgba(34,197,94,0.10)",
+    border: "1px solid #bbf7d0",
     boxSizing: "border-box",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
   },
 
+  entityChartCard: {
+    background: "#ffffff",
+    borderRadius: "24px",
+    padding: "20px",
+    height: "360px",
+    boxShadow: "0 4px 18px rgba(34,197,94,0.10)",
+    border: "1px solid #bbf7d0",
+    boxSizing: "border-box",
+    marginTop: "26px",
+  },
+
   chartTitle: {
     margin: "0 0 14px",
     fontSize: "18px",
-    fontWeight: "700",
-    color: "#17172f",
+    fontWeight: "800",
+    color: "#14532d",
   },
 
   barChartBox: {
@@ -637,5 +757,10 @@ const styles = {
   pieChartBox: {
     width: "240px",
     height: "240px",
+  },
+
+  entityChartBox: {
+    width: "100%",
+    height: "285px",
   },
 };
