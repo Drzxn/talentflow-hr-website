@@ -19,24 +19,24 @@ const allowedOrigins = [
   "http://localhost:5000",
   "https://talentflow-hr-website-1.onrender.com",
   "https://talentflow-hr-website.onrender.com",
+  "https://talentflow-hr-website-m3yb.onrender.com",
 ];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      console.log("Blocked by CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     credentials: true,
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.get("/", (req, res) => {
   res.json({
@@ -53,6 +53,16 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.get("/api/env-check", (req, res) => {
+  res.json({
+    success: true,
+    GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID ? "SET" : "MISSING",
+    GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+      ? "SET"
+      : "MISSING",
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/dashboard", dashboardRoutes);
@@ -64,6 +74,14 @@ app.use((req, res) => {
   res.status(404).json({
     success: false,
     error: "Route not found",
+    path: req.originalUrl,
+  });
+});
+
+app.use((error, req, res, next) => {
+  res.status(500).json({
+    success: false,
+    error: error.message || "Internal server error",
   });
 });
 
