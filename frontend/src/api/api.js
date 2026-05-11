@@ -1,6 +1,6 @@
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  "https://talentflow-hr-website.onrender.com";
+  "https://talentflow-hr-website-m3yb.onrender.com";
 
 export async function getDashboardData() {
   try {

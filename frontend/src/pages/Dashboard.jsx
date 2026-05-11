@@ -271,7 +271,7 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
-      const res = await fetch("https://talentflow-hr-website.onrender.com/api/sheets/dashboard");
+      const res = await fetch("https://talentflow-hr-website-m3yb.onrender.com/api/sheets/dashboard");
       const result = await res.json();
 
       setJobs(Array.isArray(result.data) ? result.data : []);
