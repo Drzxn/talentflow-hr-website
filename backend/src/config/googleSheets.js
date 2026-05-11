@@ -1,30 +1,23 @@
-// import { google } from "googleapis";
-// import path from "path";
-// import { fileURLToPath } from "url";
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-
-// const auth = new google.auth.GoogleAuth({
-//   keyFile: path.join(__dirname, "../../credentials.json"),
-//   scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-// });
-
-// const authClient = await auth.getClient();
-
-// const sheets = google.sheets({
-//   version: "v4",
-//   auth: authClient,
-// });
-
-// export default sheets;
-
 import { google } from "googleapis";
+
+function getRequiredEnv(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`${name} is missing in Render environment variables`);
+  }
+
+  return value;
+}
+
+const clientEmail = getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
+
+const privateKey = getRequiredEnv("GOOGLE_PRIVATE_KEY").replace(/\\n/g, "\n");
 
 const auth = new google.auth.GoogleAuth({
   credentials: {
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    client_email: clientEmail,
+    private_key: privateKey,
   },
   scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
 });
