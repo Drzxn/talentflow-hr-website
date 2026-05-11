@@ -74,7 +74,7 @@ export default function HospitalityDashboard() {
   const loadHospitality = async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/hospitality/dashboard");
+      const res = await fetch("https://talentflow-hr-website.onrender.com/api/hospitality/dashboard");
       const result = await res.json();
       setRows(Array.isArray(result.data) ? result.data : []);
     } catch (error) {
