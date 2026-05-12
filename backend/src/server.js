@@ -20,7 +20,8 @@ const allowedOrigins = [
   "https://talentflow-hr-website-1.onrender.com",
   "https://talentflow-hr-website.onrender.com",
   "https://talentflow-hr-website-m3yb.onrender.com",
-];
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
 app.use(
   cors({
@@ -28,7 +29,6 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-
       return callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     credentials: true,
@@ -37,6 +37,16 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+function mountRoute(path, route) {
+  if (typeof route !== "function") {
+    console.error(`❌ Route broken at ${path}. Expected function/router but got:`, typeof route);
+    throw new Error(`Route import is invalid: ${path}`);
+  }
+
+  app.use(path, route);
+  console.log(`✅ Mounted route: ${path}`);
+}
 
 app.get("/", (req, res) => {
   res.json({
@@ -63,12 +73,12 @@ app.get("/api/env-check", (req, res) => {
   });
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/sheets", googleSheetRoutes);
-app.use("/api/hospitality", hospitalityRoutes);
+mountRoute("/api/auth", authRoutes);
+mountRoute("/api/users", userRoutes);
+mountRoute("/api/dashboard", dashboardRoutes);
+mountRoute("/api/reports", reportRoutes);
+mountRoute("/api/sheets", googleSheetRoutes);
+mountRoute("/api/hospitality", hospitalityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -79,6 +89,8 @@ app.use((req, res) => {
 });
 
 app.use((error, req, res, next) => {
+  console.error("SERVER ERROR:", error);
+
   res.status(500).json({
     success: false,
     error: error.message || "Internal server error",

@@ -1,34 +1,29 @@
-import { google } from "googleapis";
+import express from "express";
+import { sheets } from "../config/googleSheets.js";
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/spreadsheets.readonly",
-];
+const router = express.Router();
 
-function getGoogleCredentials() {
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+router.get("/dashboard", async (req, res) => {
   try {
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-      return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-    }
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: "Sheet1!A:Z",
+    });
 
-    throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_JSON missing in environment variables"
-    );
+    res.json({
+      success: true,
+      data: response.data.values || [],
+    });
   } catch (error) {
-    console.log("GOOGLE AUTH ERROR:", error.message);
-    throw error;
+    console.error("MAIN GOOGLE SHEET ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
-}
-
-const credentials = getGoogleCredentials();
-
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  scopes: SCOPES,
 });
 
-export const sheets = google.sheets({
-  version: "v4",
-  auth,
-});
-
-export default sheets;
+export default router;
