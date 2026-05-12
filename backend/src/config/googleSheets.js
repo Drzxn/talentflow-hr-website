@@ -3,10 +3,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-  throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON missing");
-}
-
 const credentials = JSON.parse(
   process.env.GOOGLE_SERVICE_ACCOUNT_JSON
 );
