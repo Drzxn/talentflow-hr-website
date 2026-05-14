@@ -1,5 +1,4 @@
 import express from "express";
-<<<<<<< HEAD
 import { google } from "googleapis";
 import fs from "fs";
 
@@ -11,22 +10,60 @@ const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
    GOOGLE AUTH
 ============================== */
 
-function getGoogleAuth() {
-  const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+function parseServiceAccountJson() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
-  if (json && !json.includes("PASTE_")) {
-    try {
-      const credentials = JSON.parse(json);
+  if (!raw || raw.includes("PASTE_")) {
+    return null;
+  }
 
-      return new google.auth.GoogleAuth({
-        credentials,
-        scopes: SCOPES,
-      });
-    } catch {
-      throw new Error(
-        "GOOGLE_SERVICE_ACCOUNT_JSON is invalid JSON. Paste the full real JSON correctly."
-      );
+  try {
+    let cleaned = raw.trim();
+
+    if (
+      (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+      (cleaned.startsWith('"') && cleaned.endsWith('"'))
+    ) {
+      cleaned = cleaned.slice(1, -1);
     }
+
+    cleaned = cleaned.replace(/\r?\n/g, "");
+
+    const credentials = JSON.parse(cleaned);
+
+    if (!credentials.client_email || !credentials.private_key) {
+      throw new Error("client_email or private_key missing");
+    }
+
+    credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+
+    return credentials;
+  } catch (error) {
+    console.error("GOOGLE_SERVICE_ACCOUNT_JSON parse error:", error.message);
+
+    throw new Error(
+      "GOOGLE_SERVICE_ACCOUNT_JSON is invalid JSON. Paste the full real JSON correctly in one line."
+    );
+  }
+}
+
+function getGoogleAuth() {
+  const credentials = parseServiceAccountJson();
+
+  if (credentials) {
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: SCOPES,
+    });
+  }
+
+  const localFile = "./credentials.json";
+
+  if (fs.existsSync(localFile)) {
+    return new google.auth.GoogleAuth({
+      keyFile: localFile,
+      scopes: SCOPES,
+    });
   }
 
   const secretFile = "/etc/secrets/service-account.json";
@@ -43,10 +80,6 @@ function getGoogleAuth() {
   );
 }
 
-/* ==============================
-   SHEET HELPERS
-============================== */
-
 async function getSheetsClient() {
   const auth = getGoogleAuth();
   const client = await auth.getClient();
@@ -57,8 +90,24 @@ async function getSheetsClient() {
   });
 }
 
+/* ==============================
+   HELPERS
+============================== */
+
+async function getAvailableTabs({ sheets, spreadsheetId }) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+
+  return (
+    meta.data.sheets
+      ?.map((sheet) => sheet.properties?.title)
+      .filter(Boolean) || []
+  );
+}
+
 async function findSheetRange({ sheets, spreadsheetId, preferredRanges }) {
-  for (const range of preferredRanges) {
+  const ranges = preferredRanges.filter(Boolean);
+
+  for (const range of ranges) {
     try {
       await sheets.spreadsheets.values.get({
         spreadsheetId,
@@ -71,15 +120,13 @@ async function findSheetRange({ sheets, spreadsheetId, preferredRanges }) {
     }
   }
 
-  const meta = await sheets.spreadsheets.get({
+  const availableTabs = await getAvailableTabs({
+    sheets,
     spreadsheetId,
   });
 
-  const availableTabs =
-    meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) || [];
-
   throw new Error(
-    `No matching sheet tab found. Tried: ${preferredRanges.join(
+    `No matching sheet tab found. Tried: ${ranges.join(
       ", "
     )}. Available tabs: ${availableTabs.join(", ")}`
   );
@@ -153,20 +200,39 @@ router.get("/", (req, res) => {
       internships: "/api/sheets/internships",
       offers: "/api/sheets/offers",
       allData: "/api/sheets/all-data",
+      tabs: "/api/sheets/tabs",
     },
   });
 });
 
-router.get("/test-sheets", (req, res) => {
-  res.json({
-    success: true,
-    message: "Google Sheets routes working successfully",
-  });
-});
+router.get("/tabs", async (req, res) => {
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-/* ==============================
-   DASHBOARD
-============================== */
+    if (!spreadsheetId) {
+      throw new Error("GOOGLE_SHEET_ID is missing");
+    }
+
+    const sheets = await getSheetsClient();
+
+    const tabs = await getAvailableTabs({
+      sheets,
+      spreadsheetId,
+    });
+
+    res.json({
+      success: true,
+      sheetId: spreadsheetId,
+      tabs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      route: "/api/sheets/tabs",
+      error: error.message,
+    });
+  }
+});
 
 router.get("/dashboard", async (req, res) => {
   try {
@@ -176,55 +242,34 @@ router.get("/dashboard", async (req, res) => {
         process.env.NB_DASHBOARD_RANGE,
         process.env.GOOGLE_SHEET_RANGE,
         "Sheet1!A:Z",
-      ].filter(Boolean),
-=======
-import { sheets } from "../config/googleSheets.js";
-
-const router = express.Router();
-
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
-
-router.get("/dashboard", async (req, res) => {
-  try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: "Sheet1!A:Z",
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
+        "'Sheet1'!A:Z",
+        "Dashboard!A:Z",
+        "'Dashboard'!A:Z",
+      ],
     });
 
     res.json({
       success: true,
-<<<<<<< HEAD
       type: "dashboard",
       sheetId: process.env.GOOGLE_SHEET_ID,
       ...result,
     });
   } catch (error) {
-=======
-      data: response.data.values || [],
-    });
-  } catch (error) {
-    console.error("MAIN GOOGLE SHEET ERROR:", error);
-
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
     res.status(500).json({
       success: false,
       route: "/api/sheets/dashboard",
       error: error.message,
-<<<<<<< HEAD
       fix: "Check GOOGLE_SHEET_ID, GOOGLE_SHEET_RANGE, GOOGLE_SERVICE_ACCOUNT_JSON and Google Sheet permission.",
     });
   }
 });
 
-/* ==============================
-   SUBMISSIONS
-============================== */
-
 router.get("/submissions", async (req, res) => {
   try {
+    const sheetId = process.env.SUBMISSION_SHEET_ID || process.env.GOOGLE_SHEET_ID;
+
     const result = await getSheetRows({
-      spreadsheetId: process.env.SUBMISSION_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: sheetId,
       preferredRanges: [
         process.env.SUBMISSION_RANGE,
         "Submission!A:Z",
@@ -232,13 +277,13 @@ router.get("/submissions", async (req, res) => {
         "Submissions!A:Z",
         "'Submissions'!A:Z",
         "'Submissions Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     res.json({
       success: true,
       type: "submissions",
-      sheetId: process.env.SUBMISSION_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      sheetId,
       ...result,
     });
   } catch (error) {
@@ -251,11 +296,12 @@ router.get("/submissions", async (req, res) => {
   }
 });
 
-/* Old reports URL returns submissions data */
 router.get("/reports", async (req, res) => {
   try {
+    const sheetId = process.env.SUBMISSION_SHEET_ID || process.env.GOOGLE_SHEET_ID;
+
     const result = await getSheetRows({
-      spreadsheetId: process.env.SUBMISSION_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: sheetId,
       preferredRanges: [
         process.env.SUBMISSION_RANGE,
         "Submission!A:Z",
@@ -263,13 +309,13 @@ router.get("/reports", async (req, res) => {
         "Submissions!A:Z",
         "'Submissions'!A:Z",
         "'Submissions Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     res.json({
       success: true,
-      type: "submissions",
-      sheetId: process.env.SUBMISSION_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      type: "reports",
+      sheetId,
       ...result,
     });
   } catch (error) {
@@ -282,14 +328,12 @@ router.get("/reports", async (req, res) => {
   }
 });
 
-/* ==============================
-   INTERNSHIPS
-============================== */
-
 router.get("/internships", async (req, res) => {
   try {
+    const sheetId = process.env.INTERNSHIP_SHEET_ID || process.env.GOOGLE_SHEET_ID;
+
     const result = await getSheetRows({
-      spreadsheetId: process.env.INTERNSHIP_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: sheetId,
       preferredRanges: [
         process.env.INTERNSHIP_RANGE,
         "Internship!A:Z",
@@ -297,13 +341,13 @@ router.get("/internships", async (req, res) => {
         "Internships!A:Z",
         "'Internships'!A:Z",
         "'Internship Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     res.json({
       success: true,
       type: "internships",
-      sheetId: process.env.INTERNSHIP_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      sheetId,
       ...result,
     });
   } catch (error) {
@@ -316,28 +360,30 @@ router.get("/internships", async (req, res) => {
   }
 });
 
-/* ==============================
-   OFFERS
-============================== */
-
 router.get("/offers", async (req, res) => {
   try {
+    const sheetId =
+      process.env.OFFER_SHEET_ID ||
+      process.env.OFFERS_SHEET_ID ||
+      process.env.GOOGLE_SHEET_ID;
+
     const result = await getSheetRows({
-      spreadsheetId: process.env.OFFER_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: sheetId,
       preferredRanges: [
         process.env.OFFER_RANGE,
+        process.env.OFFERS_RANGE,
         "Offer!A:Z",
         "'Offer'!A:Z",
         "Offers!A:Z",
         "'Offers'!A:Z",
         "'Offers Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     res.json({
       success: true,
       type: "offers",
-      sheetId: process.env.OFFER_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      sheetId,
       ...result,
     });
   } catch (error) {
@@ -345,14 +391,10 @@ router.get("/offers", async (req, res) => {
       success: false,
       route: "/api/sheets/offers",
       error: error.message,
-      fix: "Check OFFER_SHEET_ID, OFFER_RANGE, GOOGLE_SERVICE_ACCOUNT_JSON and Google Sheet permission.",
+      fix: "Check OFFER_SHEET_ID/OFFERS_SHEET_ID, OFFER_RANGE/OFFERS_RANGE, GOOGLE_SERVICE_ACCOUNT_JSON and Google Sheet permission.",
     });
   }
 });
-
-/* ==============================
-   ALL DATA
-============================== */
 
 router.get("/all-data", async (req, res) => {
   try {
@@ -365,7 +407,7 @@ router.get("/all-data", async (req, res) => {
         "Submissions!A:Z",
         "'Submissions'!A:Z",
         "'Submissions Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     const internships = await getSheetRows({
@@ -377,19 +419,23 @@ router.get("/all-data", async (req, res) => {
         "Internships!A:Z",
         "'Internships'!A:Z",
         "'Internship Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     const offers = await getSheetRows({
-      spreadsheetId: process.env.OFFER_SHEET_ID || process.env.GOOGLE_SHEET_ID,
+      spreadsheetId:
+        process.env.OFFER_SHEET_ID ||
+        process.env.OFFERS_SHEET_ID ||
+        process.env.GOOGLE_SHEET_ID,
       preferredRanges: [
         process.env.OFFER_RANGE,
+        process.env.OFFERS_RANGE,
         "Offer!A:Z",
         "'Offer'!A:Z",
         "Offers!A:Z",
         "'Offers'!A:Z",
         "'Offers Data'!A:Z",
-      ].filter(Boolean),
+      ],
     });
 
     res.json({
@@ -409,8 +455,6 @@ router.get("/all-data", async (req, res) => {
       route: "/api/sheets/all-data",
       error: error.message,
       fix: "Check all sheet IDs, ranges, GOOGLE_SERVICE_ACCOUNT_JSON and Google Sheet permission.",
-=======
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
     });
   }
 });

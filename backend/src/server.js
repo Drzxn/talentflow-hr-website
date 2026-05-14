@@ -14,53 +14,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5000",
-<<<<<<< HEAD
-  "https://talent-hr.netlify.app",
-  "https://talentflow-hr-website-1jga.onrender.com",
-=======
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
-  "https://talentflow-hr-website-1.onrender.com",
-  "https://talentflow-hr-website.onrender.com",
-  "https://talentflow-hr-website-m3yb.onrender.com",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-<<<<<<< HEAD
-
-=======
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
-      return callback(new Error(`Not allowed by CORS: ${origin}`));
-    },
-    credentials: true,
-  })
-);
-
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 function mountRoute(path, route) {
-  if (typeof route !== "function") {
-<<<<<<< HEAD
-=======
-    console.error(`❌ Route broken at ${path}. Expected function/router but got:`, typeof route);
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
-    throw new Error(`Route import is invalid: ${path}`);
+  if (!route) {
+    console.error(`Route missing: ${path}`);
+    return;
   }
-
   app.use(path, route);
-<<<<<<< HEAD
-=======
-  console.log(`✅ Mounted route: ${path}`);
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
+  console.log(`Mounted route: ${path}`);
 }
 
 app.get("/", (req, res) => {
@@ -82,16 +46,20 @@ app.get("/api/health", (req, res) => {
 app.get("/api/env-check", (req, res) => {
   res.json({
     success: true,
+    PORT: process.env.PORT || "5000",
     GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID ? "SET" : "MISSING",
-    GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-      ? "SET"
-      : "MISSING",
-<<<<<<< HEAD
+    GOOGLE_SHEET_RANGE: process.env.GOOGLE_SHEET_RANGE || "MISSING",
+    GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? "SET" : "MISSING",
+    SUBMISSION_SHEET_ID: process.env.SUBMISSION_SHEET_ID ? "SET" : "MISSING",
     SUBMISSION_RANGE: process.env.SUBMISSION_RANGE || "MISSING",
+    INTERNSHIP_SHEET_ID: process.env.INTERNSHIP_SHEET_ID ? "SET" : "MISSING",
     INTERNSHIP_RANGE: process.env.INTERNSHIP_RANGE || "MISSING",
+    OFFER_SHEET_ID: process.env.OFFER_SHEET_ID ? "SET" : "MISSING",
+    OFFERS_SHEET_ID: process.env.OFFERS_SHEET_ID ? "SET" : "MISSING",
     OFFER_RANGE: process.env.OFFER_RANGE || "MISSING",
-=======
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
+    OFFERS_RANGE: process.env.OFFERS_RANGE || "MISSING",
+    HOSPITALITY_SHEET_ID: process.env.HOSPITALITY_SHEET_ID ? "SET" : "MISSING",
+    HOSPITALITY_SHEET_RANGE: process.env.HOSPITALITY_SHEET_RANGE || "MISSING",
   });
 });
 
@@ -101,7 +69,6 @@ mountRoute("/api/dashboard", dashboardRoutes);
 mountRoute("/api/reports", reportRoutes);
 mountRoute("/api/sheets", googleSheetRoutes);
 mountRoute("/api/hospitality", hospitalityRoutes);
-<<<<<<< HEAD
 
 app.get("/api/test", (req, res) => {
   res.json({
@@ -116,17 +83,17 @@ app.get("/api/test-sheets", (req, res) => {
     message: "Google Sheets test route working successfully",
     testUrls: {
       sheetsRoot: "/api/sheets",
+      tabs: "/api/sheets/tabs",
       dashboard: "/api/sheets/dashboard",
       submissions: "/api/sheets/submissions",
       reports: "/api/sheets/reports",
       internships: "/api/sheets/internships",
       offers: "/api/sheets/offers",
       allData: "/api/sheets/all-data",
+      hospitality: "/api/hospitality/dashboard",
     },
   });
 });
-=======
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
 
 app.use((req, res) => {
   res.status(404).json({
@@ -138,7 +105,6 @@ app.use((req, res) => {
 
 app.use((error, req, res, next) => {
   console.error("SERVER ERROR:", error);
-
   res.status(500).json({
     success: false,
     error: error.message || "Internal server error",
@@ -146,11 +112,8 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log("=================================");
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Local: http://localhost:${PORT}`);
-  console.log(`✅ Health: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Env Check: http://localhost:${PORT}/api/env-check`);
-  console.log(`✅ Sheets: http://localhost:${PORT}/api/sheets`);
-  console.log("=================================");
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Health: http://localhost:${PORT}/api/health`);
+  console.log(`Sheets: http://localhost:${PORT}/api/sheets`);
+  console.log(`Offers: http://localhost:${PORT}/api/sheets/offers`);
 });

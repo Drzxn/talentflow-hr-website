@@ -1,96 +1,95 @@
 import { google } from "googleapis";
-<<<<<<< HEAD
 import fs from "fs";
-
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
-
-/* ==============================
-   GOOGLE AUTH
-============================== */
-
-function getGoogleAuth() {
-  const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-
-  /* Render Environment Variable JSON */
-  if (json && !json.includes("PASTE_")) {
-    try {
-      const credentials = JSON.parse(json);
-
-      return new google.auth.GoogleAuth({
-        credentials,
-        scopes: SCOPES,
-      });
-    } catch {
-      throw new Error(
-        "GOOGLE_SERVICE_ACCOUNT_JSON is invalid JSON. Paste real Google service account JSON."
-      );
-    }
-  }
-
-  /* Local credentials.json fallback */
-  const localFile = "./credentials.json";
-
-  if (fs.existsSync(localFile)) {
-    return new google.auth.GoogleAuth({
-      keyFile: localFile,
-      scopes: SCOPES,
-    });
-  }
-
-  /* Render secret file fallback */
-  const renderSecret = "/etc/secrets/service-account.json";
-
-  if (fs.existsSync(renderSecret)) {
-    return new google.auth.GoogleAuth({
-      keyFile: renderSecret,
-      scopes: SCOPES,
-    });
-  }
-
-  throw new Error(
-    "Google credentials missing. Add GOOGLE_SERVICE_ACCOUNT_JSON or credentials.json"
-  );
-}
-
-/* ==============================
-   SHEETS CLIENT
-============================== */
-
-const auth = getGoogleAuth();
-=======
 
 const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets.readonly",
 ];
 
-function getGoogleCredentials() {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+/* =========================================
+   PARSE GOOGLE JSON
+========================================= */
+
+function parseGoogleCredentials() {
+  try {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+
+    if (!raw) {
+      return null;
+    }
+
+    let cleaned = raw.trim();
+
+    /* Remove wrapping quotes */
+    if (
+      (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+      (cleaned.startsWith('"') && cleaned.endsWith('"'))
+    ) {
+      cleaned = cleaned.slice(1, -1);
+    }
+
+    const credentials = JSON.parse(cleaned);
+
+    /* IMPORTANT FIX */
+    credentials.private_key = credentials.private_key
+      .replace(/\\n/g, "\n")
+      .replace(/\r/g, "");
+
+    return credentials;
+  } catch (error) {
+    console.error("GOOGLE JSON ERROR:", error);
+
     throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_JSON missing in environment variables"
+      "GOOGLE_SERVICE_ACCOUNT_JSON is invalid JSON"
     );
   }
-
-  const credentials = JSON.parse(
-    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  );
-
-  credentials.private_key =
-    credentials.private_key.replace(/\\n/g, "\n");
-
-  return credentials;
 }
 
-const credentials = getGoogleCredentials();
+/* =========================================
+   GOOGLE AUTH
+========================================= */
 
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  scopes: SCOPES,
-});
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
+function getGoogleAuth() {
+  /* ENV JSON */
 
-export const sheets = google.sheets({
-  version: "v4",
-  auth,
-});
+  const credentials = parseGoogleCredentials();
 
-export default sheets;
+  if (credentials) {
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: SCOPES,
+    });
+  }
+
+  /* LOCAL FILE */
+
+  if (fs.existsSync("./credentials.json")) {
+    return new google.auth.GoogleAuth({
+      keyFile: "./credentials.json",
+      scopes: SCOPES,
+    });
+  }
+
+  /* RENDER SECRET FILE */
+
+  if (fs.existsSync("/etc/secrets/service-account.json")) {
+    return new google.auth.GoogleAuth({
+      keyFile: "/etc/secrets/service-account.json",
+      scopes: SCOPES,
+    });
+  }
+
+  throw new Error(
+    "Google credentials missing"
+  );
+}
+
+export async function getSheetsClient() {
+  const auth = getGoogleAuth();
+
+  const client = await auth.getClient();
+
+  return google.sheets({
+    version: "v4",
+    auth: client,
+  });
+}
