@@ -16,7 +16,7 @@ export default function HospitalityReports() {
         "https://talentflow-hr-website-1jga.onrender.com/api/hospitality/dashboard"
       );
 
-      const res = await fetch("https://talentflow-hr-website-m3yb.onrender.com/api/hospitality/dashboard");
+
 
       const result = await res.json();
       setRows(Array.isArray(result.data) ? result.data : []);
