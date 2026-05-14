@@ -208,12 +208,9 @@ export default function Reports() {
       setLoading(true);
       setErrorMsg("");
 
-<<<<<<< HEAD
       const urls = [`${API_BASE}/api/sheets/reports`, `${API_BASE}/api/sheets/dashboard`];
-=======
       const res = await fetch("https://talentflow-hr-website-m3yb.onrender.com/api/sheets/dashboard");
       const result = await res.json();
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
 
       let finalRows = [];
 

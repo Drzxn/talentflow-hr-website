@@ -1,8 +1,18 @@
 import express from "express";
 import { google } from "googleapis";
-import path from "path";
 
 const router = express.Router();
+
+function getGoogleAuth() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_FILE) {
+    return new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+  }
+
+  throw new Error("GOOGLE_SERVICE_ACCOUNT_FILE is missing in .env");
+}
 
 router.get("/dashboard", async (req, res) => {
   try {
@@ -15,11 +25,7 @@ router.get("/dashboard", async (req, res) => {
       });
     }
 
-    const auth = new google.auth.GoogleAuth({
-      keyFile: "/etc/secrets/service-account.json",
-      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-    });
-
+    const auth = getGoogleAuth();
     const client = await auth.getClient();
 
     const sheets = google.sheets({
@@ -32,13 +38,6 @@ router.get("/dashboard", async (req, res) => {
     });
 
     const sheetName = meta.data.sheets?.[0]?.properties?.title;
-
-    if (!sheetName) {
-      return res.status(404).json({
-        success: false,
-        error: "No sheet tab found in Hospitality Sheet",
-      });
-    }
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
@@ -57,15 +56,13 @@ router.get("/dashboard", async (req, res) => {
       });
     }
 
-    const headers = rows[0].map((header) => String(header).trim());
+    const headers = rows[0].map((header) => String(header || "").trim());
 
     const data = rows.slice(1).map((row) => {
       const obj = {};
-
       headers.forEach((header, index) => {
-        obj[header] = row[index] || "";
+        if (header) obj[header] = row[index] || "";
       });
-
       return obj;
     });
 
@@ -82,9 +79,6 @@ router.get("/dashboard", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
-      fix:
-        "Share the Hospitality Google Sheet with talentflow-service-439@complete-octane-495507-f1.iam.gserviceaccount.com as Viewer.",
-      sheetId: process.env.HOSPITALITY_SHEET_ID || null,
     });
   }
 });

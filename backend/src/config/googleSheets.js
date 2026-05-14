@@ -1,91 +1,69 @@
 import { google } from "googleapis";
 import fs from "fs";
+import path from "path";
+import process from "process";
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/spreadsheets.readonly",
-];
+const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
 
-/* =========================================
-   PARSE GOOGLE JSON
-========================================= */
-
-function parseGoogleCredentials() {
-  try {
-    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-
-    if (!raw) {
-      return null;
-    }
-
-    let cleaned = raw.trim();
-
-    /* Remove wrapping quotes */
-    if (
-      (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
-      (cleaned.startsWith('"') && cleaned.endsWith('"'))
-    ) {
-      cleaned = cleaned.slice(1, -1);
-    }
-
-    const credentials = JSON.parse(cleaned);
-
-    /* IMPORTANT FIX */
+function cleanPrivateKey(credentials) {
+  if (credentials?.private_key) {
     credentials.private_key = credentials.private_key
       .replace(/\\n/g, "\n")
       .replace(/\r/g, "");
-
-    return credentials;
-  } catch (error) {
-    console.error("GOOGLE JSON ERROR:", error);
-
-    throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_JSON is invalid JSON"
-    );
   }
+
+  return credentials;
 }
 
-/* =========================================
-   GOOGLE AUTH
-========================================= */
-
 function getGoogleAuth() {
-  /* ENV JSON */
+  const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64?.trim();
+  const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
+  const envFile = process.env.GOOGLE_SERVICE_ACCOUNT_FILE?.trim();
 
-  const credentials = parseGoogleCredentials();
+  if (base64 && base64.startsWith("ey")) {
+    const jsonString = Buffer.from(base64, "base64").toString("utf8");
+    const credentials = cleanPrivateKey(JSON.parse(jsonString));
 
-  if (credentials) {
     return new google.auth.GoogleAuth({
       credentials,
       scopes: SCOPES,
     });
   }
 
-  /* LOCAL FILE */
+  if (rawJson && rawJson.startsWith("{")) {
+    const credentials = cleanPrivateKey(JSON.parse(rawJson));
 
-  if (fs.existsSync("./credentials.json")) {
     return new google.auth.GoogleAuth({
-      keyFile: "./credentials.json",
+      credentials,
       scopes: SCOPES,
     });
   }
 
-  /* RENDER SECRET FILE */
+  const possibleFiles = [
+    envFile,
+    "./service-account.json",
+    path.join(process.cwd(), "service-account.json"),
+    path.join(process.cwd(), "backend", "service-account.json"),
+    path.join(process.cwd(), "src", "service-account.json"),
+    "/etc/secrets/service-account.json",
+  ].filter(Boolean);
 
-  if (fs.existsSync("/etc/secrets/service-account.json")) {
-    return new google.auth.GoogleAuth({
-      keyFile: "/etc/secrets/service-account.json",
-      scopes: SCOPES,
-    });
+  for (const filePath of possibleFiles) {
+    if (fs.existsSync(filePath)) {
+      return new google.auth.GoogleAuth({
+        keyFile: filePath,
+        scopes: SCOPES,
+      });
+    }
   }
 
   throw new Error(
-    "Google credentials missing"
+    "Google credentials missing. Use GOOGLE_SERVICE_ACCOUNT_FILE=./service-account.json locally. Do not set GOOGLE_SERVICE_ACCOUNT_JSON=service-account.json."
   );
 }
 
 export async function getSheetsClient() {
   const auth = getGoogleAuth();
-
   const client = await auth.getClient();
 
   return google.sheets({
@@ -93,3 +71,5 @@ export async function getSheetsClient() {
     auth: client,
   });
 }
+
+export default getSheetsClient;

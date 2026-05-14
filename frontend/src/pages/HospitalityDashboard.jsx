@@ -40,7 +40,7 @@ export default function HospitalityDashboard() {
   const didLoad = useRef(false);
 
   const toNumber = (value) => {
-    const num = Number(value || 0);
+    const num = Number(String(value || "0").replace(/,/g, ""));
     return Number.isNaN(num) ? 0 : num;
   };
 
@@ -99,12 +99,8 @@ export default function HospitalityDashboard() {
   const loadHospitality = async () => {
     try {
       setLoading(true);
-<<<<<<< HEAD
 
       const res = await fetch(`${API_BASE}/api/hospitality/dashboard`);
-=======
-      const res = await fetch("https://talentflow-hr-website-m3yb.onrender.com/api/hospitality/dashboard");
->>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
       const result = await res.json();
 
       const rawRows = Array.isArray(result.data) ? result.data : [];
@@ -121,6 +117,7 @@ export default function HospitalityDashboard() {
 
   useEffect(() => {
     if (didLoad.current) return;
+
     didLoad.current = true;
     loadHospitality();
   }, []);
@@ -136,6 +133,7 @@ export default function HospitalityDashboard() {
 
   const functions = useMemo(() => {
     const sheetFunctions = rows.map(getFunction).filter(Boolean);
+
     return ["All", ...Array.from(new Set(sheetFunctions)).sort()];
   }, [rows]);
 
@@ -199,7 +197,6 @@ export default function HospitalityDashboard() {
       (acc, item) => {
         acc.totalPositions += toNumber(item["Total Positions"]);
 
-        // Joined replaced with Closed
         acc.closed += toNumber(
           item["Closed"] ||
             item["Joined"] ||

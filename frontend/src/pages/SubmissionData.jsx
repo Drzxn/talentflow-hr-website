@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import StatCard from "../components/StatCard";
 
-const API_BASE =
+const RAW_API_BASE =
   import.meta.env.VITE_API_URL ||
   "https://talentflow-hr-website-1jga.onrender.com";
+
+const API_BASE = RAW_API_BASE
+  .replace(/\/$/, "")
+  .replace(/\/api\/sheets$/i, "")
+  .replace(/\/api$/i, "");
 
 const STATUS_OPTIONS = [
   "In Process",
@@ -16,6 +21,22 @@ const STATUS_OPTIONS = [
   "Dint process as position closed",
   "Duplicate Submission",
 ];
+
+const SUBMITTED_BY_OPTIONS = [
+  "Sira",
+  "R2R",
+  "Talent Corner",
+  "TA Maniram",
+  "Adecco",
+  "Talent Infinity",
+  "Formore Talent",
+  "On Time FS",
+  "Cernobia",
+  "TA Praveen",
+  "TA New",
+  "Internal",
+];
+
 
 const FUNCTION_OPTIONS = [
   "Presales",
@@ -40,206 +61,168 @@ const FUNCTION_OPTIONS = [
   "Marketing",
   "Design",
   "Purchase",
-];
-
-const SUBMITTED_BY_OPTIONS = [
-  "Sira",
-  "R2R",
-  "Talent Corner",
-  "TA Manira",
-  "Adecco",
-  "Talent Infinity",
-  "Formore Talent",
-  "On Time FS",
-  "Cernobia",
-  "TA Praveen",
-];
-
-const TIME_FILTERS = [
-  "All Time",
-  "Today",
-  "Yesterday",
-  "This Week",
-  "This Month",
-  "90 Days",
-  "This Year",
-  "Custom Range",
+  "HR",
+  "Payroll",
 ];
 
 export default function SubmissionData() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
 
   const [selectedSubmittedBy, setSelectedSubmittedBy] = useState("All");
   const [selectedFunction, setSelectedFunction] = useState("All");
-  const [selectedTime, setSelectedTime] = useState("All Time");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-  const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
 
   const cleanText = (value) => String(value || "").trim();
 
+  const normalizeText = (value) =>
+    cleanText(value).toLowerCase().replace(/\s+/g, " ");
+
+  const getValueByPossibleKeys = (item, keys) => {
+    for (const key of keys) {
+      const matchedKey = Object.keys(item || {}).find(
+        (k) => normalizeText(k) === normalizeText(key)
+      );
+
+      if (matchedKey) return item[matchedKey];
+    }
+
+    return "";
+  };
+
+  const getSubmittedBy = (item) =>
+    cleanText(
+      getValueByPossibleKeys(item, [
+        "Submitted By",
+        "SubmittedBy",
+        "Vendor",
+        "Source",
+        "Consultant",
+        "TA",
+        "Recruiter",
+      ])
+    );
+
+  const getFunction = (item) =>
+    cleanText(
+      getValueByPossibleKeys(item, [
+        "Function",
+        "Functions",
+        "Department",
+        "Dept",
+      ])
+    );
+
   const normalizeStatus = (value) => {
-    const text = cleanText(value).toLowerCase();
+    const text = normalizeText(value);
 
-    const matched = STATUS_OPTIONS.find(
-      (status) => status.toLowerCase() === text
-    );
+    if (!text) return "";
+    if (text.includes("in process")) return "In Process";
+    if (text.includes("screen") && text.includes("reject"))
+      return "Screen Rejected";
+    if (text.includes("interview") && text.includes("reject"))
+      return "Rejected In Interview";
+    if (text.includes("offer") && text.includes("declin"))
+      return "Offer Declined";
+    if (text.includes("offer") && text.includes("accept"))
+      return "Offer Accepted";
+    if (text.includes("joined")) return "Joined";
+    if (text.includes("not available") || text.includes("no available"))
+      return "No available for interview";
+    if (text.includes("position closed") || text.includes("dint process"))
+      return "Dint process as position closed";
+    if (text.includes("duplicate")) return "Duplicate Submission";
 
-    return matched || cleanText(value);
-  };
-
-  const normalizeFunction = (value) => {
-    const text = cleanText(value).toLowerCase();
-
-    const matched = FUNCTION_OPTIONS.find(
-      (fn) => fn.toLowerCase() === text
-    );
-
-    return matched || cleanText(value);
-  };
-
-  const normalizeSubmittedBy = (value) => {
-    const text = cleanText(value).toLowerCase();
-
-    const matched = SUBMITTED_BY_OPTIONS.find(
-      (name) => name.toLowerCase() === text
-    );
-
-    return matched || cleanText(value);
+    return cleanText(value);
   };
 
   const parseDate = (value) => {
     if (!value) return null;
 
-    const d = new Date(value);
-    if (!Number.isNaN(d.getTime())) return d;
+    const directDate = new Date(value);
+    if (!Number.isNaN(directDate.getTime())) return directDate;
 
     const text = String(value).trim();
 
-    if (text.includes("-")) {
-      const parts = text.split("-");
-      if (parts.length === 3) {
-        const [dd, mm, yyyy] = parts;
-        const date = new Date(`${yyyy}-${mm}-${dd}`);
-        if (!Number.isNaN(date.getTime())) return date;
-      }
-    }
-
     if (text.includes("/")) {
-      const parts = text.split("/");
-      if (parts.length === 3) {
-        const [dd, mm, yyyy] = parts;
-        const date = new Date(`${yyyy}-${mm}-${dd}`);
-        if (!Number.isNaN(date.getTime())) return date;
-      }
+      const [dd, mm, yyyy] = text.split("/");
+      const parsed = new Date(`${yyyy}-${mm}-${dd}`);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
     }
 
     return null;
   };
 
-  const getSubmittedBy = (item) =>
-    normalizeSubmittedBy(
-      item["Submitted By"] ||
-        item["Submitted by"] ||
-        item["submitted by"] ||
-        item["TA"] ||
-        item["Recruiter"]
-    );
+  const formatDateKey = (date) => {
+    if (!date) return "";
 
-  const getFunction = (item) =>
-    normalizeFunction(
-      item["Functions"] || item["Function"] || item["Department"]
-    );
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
 
   const getStatus = (item) =>
-    normalizeStatus(item["Status"] || item["status"]);
-
-  const getDate = (item) =>
-    parseDate(
-      item["Date of Submission"] ||
-        item["Submission Date"] ||
-        item["Submitted Date"] ||
-        item["Date"]
+    normalizeStatus(
+      getValueByPossibleKeys(item, [
+        "Status",
+        "Candidate Status",
+        "Submission Status",
+      ])
     );
 
-  const startOfDay = (date) => {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  };
+  const getDateValue = (item) =>
+    getValueByPossibleKeys(item, [
+      "Date of Submission",
+      "Submission Date",
+      "Submitted Date",
+      "Date",
+    ]);
 
-  const endOfDay = (date) => {
-    const d = new Date(date);
-    d.setHours(23, 59, 59, 999);
-    return d;
-  };
-
-  const isInsideTimeFilter = (item) => {
-    if (selectedTime === "All Time") return true;
-
-    const rowDate = getDate(item);
-    if (!rowDate) return false;
-
-    const today = new Date();
-    let from = null;
-    let to = null;
-
-    if (selectedTime === "Today") {
-      from = startOfDay(today);
-      to = endOfDay(today);
-    }
-
-    if (selectedTime === "Yesterday") {
-      const y = new Date(today);
-      y.setDate(y.getDate() - 1);
-      from = startOfDay(y);
-      to = endOfDay(y);
-    }
-
-    if (selectedTime === "This Week") {
-      const d = new Date(today);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      from = startOfDay(new Date(d.setDate(diff)));
-      to = endOfDay(today);
-    }
-
-    if (selectedTime === "This Month") {
-      from = startOfDay(new Date(today.getFullYear(), today.getMonth(), 1));
-      to = endOfDay(today);
-    }
-
-    if (selectedTime === "90 Days") {
-      from = startOfDay(today);
-      from.setDate(from.getDate() - 90);
-      to = endOfDay(today);
-    }
-
-    if (selectedTime === "This Year") {
-      from = startOfDay(new Date(today.getFullYear(), 0, 1));
-      to = endOfDay(today);
-    }
-
-    if (selectedTime === "Custom Range") {
-      if (!customFrom || !customTo) return true;
-      from = startOfDay(new Date(customFrom));
-      to = endOfDay(new Date(customTo));
-    }
-
-    return rowDate >= from && rowDate <= to;
-  };
+  const getDate = (item) => parseDate(getDateValue(item));
 
   const loadData = async () => {
     try {
       setLoading(true);
+      setApiError("");
 
-      const res = await fetch(`${API_BASE}/api/sheets/reports`);
-      const result = await res.json();
+      const res = await fetch(`${API_BASE}/api/sheets/reports`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-      setRows(Array.isArray(result.data) ? result.data : []);
+      const text = await res.text();
+
+      let result = {};
+
+      try {
+        result = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Invalid JSON response (${res.status})`);
+      }
+
+      if (!res.ok || result.success === false) {
+        throw new Error(
+          result.error ||
+            result.message ||
+            `Backend request failed (${res.status})`
+        );
+      }
+
+      const data = Array.isArray(result.data) ? result.data : [];
+
+      const validRows = data.filter((item) =>
+        Object.values(item || {}).some((value) => cleanText(value))
+      );
+
+      setRows(validRows);
     } catch (error) {
-      console.log("SUBMISSION DATA ERROR:", error);
+      console.error("SUBMISSION DATA ERROR:", error);
+      setApiError(error.message || "Unable to load submission data");
       setRows([]);
     } finally {
       setLoading(false);
@@ -250,127 +233,81 @@ export default function SubmissionData() {
     loadData();
   }, []);
 
-  const submittedByOptions = useMemo(() => {
-    const sheetValues = rows.map(getSubmittedBy).filter(Boolean);
-
-    return [
-      "All",
-      ...Array.from(new Set([...SUBMITTED_BY_OPTIONS, ...sheetValues])).sort(),
-    ];
-  }, [rows]);
-
-  const functionOptions = useMemo(() => {
-    const sheetValues = rows.map(getFunction).filter(Boolean);
-
-    return [
-      "All",
-      ...Array.from(new Set([...FUNCTION_OPTIONS, ...sheetValues])).sort(),
-    ];
-  }, [rows]);
-
   const filteredRows = useMemo(() => {
     return rows.filter((item) => {
-      const submittedBy = getSubmittedBy(item);
-      const fn = getFunction(item);
+      const itemDate = getDate(item);
+      const itemDateKey = formatDateKey(itemDate);
+
+      const dateMatch = !selectedDate || itemDateKey === selectedDate;
 
       const submittedByMatch =
-        selectedSubmittedBy === "All" || submittedBy === selectedSubmittedBy;
+        selectedSubmittedBy === "All" ||
+        normalizeText(getSubmittedBy(item)) ===
+          normalizeText(selectedSubmittedBy);
 
       const functionMatch =
-        selectedFunction === "All" || fn === selectedFunction;
+        selectedFunction === "All" ||
+        normalizeText(getFunction(item)) === normalizeText(selectedFunction);
 
-      const searchMatch = JSON.stringify(item)
-        .toLowerCase()
-        .includes(search.toLowerCase());
-
-      return (
-        submittedByMatch &&
-        functionMatch &&
-        isInsideTimeFilter(item) &&
-        searchMatch
-      );
+      return dateMatch && submittedByMatch && functionMatch;
     });
-  }, [
-    rows,
-    selectedSubmittedBy,
-    selectedFunction,
-    selectedTime,
-    customFrom,
-    customTo,
-    search,
-  ]);
+  }, [rows, selectedDate, selectedSubmittedBy, selectedFunction]);
 
-  const statusCountMap = useMemo(() => {
-    const map = {};
+  const statusCounts = useMemo(() => {
+    const counts = {};
 
     STATUS_OPTIONS.forEach((status) => {
-      map[status] = 0;
+      counts[status] = 0;
     });
 
     filteredRows.forEach((item) => {
-      const status = getStatus(item) || "Unknown";
-      map[status] = (map[status] || 0) + 1;
-    });
+      const status = getStatus(item);
 
-    return map;
-  }, [filteredRows]);
-
-  const statusCards = useMemo(() => {
-    const fixedCards = STATUS_OPTIONS.map((status) => [
-      status,
-      statusCountMap[status] || 0,
-    ]);
-
-    const extraCards = Object.entries(statusCountMap).filter(
-      ([status]) => !STATUS_OPTIONS.includes(status)
-    );
-
-    return [...fixedCards, ...extraCards];
-  }, [statusCountMap]);
-
-  const reportRows = useMemo(() => {
-    const map = {};
-
-    filteredRows.forEach((item) => {
-      const submittedBy = getSubmittedBy(item) || "Unknown";
-      const fn = getFunction(item) || "Unknown";
-      const status = getStatus(item) || "Unknown";
-
-      const key = `${submittedBy}__${fn}__${status}`;
-
-      if (!map[key]) {
-        map[key] = {
-          submittedBy,
-          functionName: fn,
-          status,
-          count: 0,
-        };
+      if (counts[status] !== undefined) {
+        counts[status] += 1;
       }
-
-      map[key].count += 1;
     });
 
-    return Object.values(map).sort((a, b) => b.count - a.count);
+    return counts;
   }, [filteredRows]);
+
+  const clearFilters = () => {
+    setSelectedSubmittedBy("All");
+    setSelectedFunction("All");
+    setSelectedDate("");
+  };
 
   return (
     <>
       <h1 className="page-title">NB Submission Data</h1>
 
       <p className="page-subtitle">
-        NB submission dashboard with Submitted By, Function, Timeline and Status
-        report.
+        Submission dashboard with status summary.
       </p>
 
+      {apiError && (
+        <div style={styles.errorBox}>
+          <strong>Backend Error:</strong> {apiError}
+        </div>
+      )}
+
       <div style={styles.filterBar}>
+        <input
+          style={styles.input}
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+        />
+
         <select
           style={styles.select}
           value={selectedSubmittedBy}
           onChange={(e) => setSelectedSubmittedBy(e.target.value)}
         >
-          {submittedByOptions.map((name) => (
+          <option value="All">All Submitted By</option>
+          {SUBMITTED_BY_OPTIONS.map((name) => (
             <option key={name} value={name}>
-              {name === "All" ? "All Submitted By" : name}
+              {name}
             </option>
           ))}
         </select>
@@ -380,156 +317,60 @@ export default function SubmissionData() {
           value={selectedFunction}
           onChange={(e) => setSelectedFunction(e.target.value)}
         >
-          {functionOptions.map((fn) => (
+          <option value="All">All Functions</option>
+          {FUNCTION_OPTIONS.map((fn) => (
             <option key={fn} value={fn}>
-              {fn === "All" ? "All Functions" : fn}
+              {fn}
             </option>
           ))}
         </select>
-
-        <select
-          style={styles.select}
-          value={selectedTime}
-          onChange={(e) => setSelectedTime(e.target.value)}
-        >
-          {TIME_FILTERS.map((filter) => (
-            <option key={filter} value={filter}>
-              {filter}
-            </option>
-          ))}
-        </select>
-
-        {selectedTime === "Custom Range" && (
-          <>
-            <input
-              style={styles.input}
-              type="date"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-            />
-
-            <input
-              style={styles.input}
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-            />
-          </>
-        )}
-
-        <input
-          style={styles.search}
-          placeholder="Search submission data..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
 
         <button style={styles.refreshBtn} onClick={loadData}>
           Refresh
+        </button>
+
+        <button style={styles.clearBtn} onClick={clearFilters}>
+          Clear
         </button>
       </div>
 
       {loading ? (
         <p>Loading submission data...</p>
       ) : (
-        <>
-          <div className="cards-grid">
+        <div className="cards-grid">
+          <StatCard
+            label="Total Submissions"
+            value={filteredRows.length}
+            change="Filtered submissions"
+            colorClass="c1"
+          />
+
+          {STATUS_OPTIONS.map((status, index) => (
             <StatCard
-              label="Total Submissions"
-              value={filteredRows.length}
-              change="From selected filters"
-              colorClass="c1"
+              key={status}
+              label={status}
+              value={statusCounts[status] || 0}
+              change="Status count"
+              colorClass={`c${(index % 8) + 2}`}
             />
-
-            {statusCards.map(([status, count], index) => (
-              <StatCard
-                key={status}
-                label={status}
-                value={count}
-                change="Status count"
-                colorClass={`c${(index % 8) + 1}`}
-              />
-            ))}
-          </div>
-
-          <div style={styles.reportCard}>
-            <h3 style={styles.reportTitle}>NB Submission Status Report</h3>
-
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Submitted By</th>
-                    <th style={styles.th}>Function</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Count</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {reportRows.map((row, index) => (
-                    <tr key={index}>
-                      <td style={styles.td}>{row.submittedBy}</td>
-                      <td style={styles.td}>{row.functionName}</td>
-                      <td style={styles.td}>{row.status}</td>
-                      <td style={styles.td}>{row.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {!reportRows.length && (
-                <p style={styles.emptyText}>No report data found.</p>
-              )}
-            </div>
-          </div>
-
-          <div style={styles.reportCard}>
-            <h3 style={styles.reportTitle}>NB Submission Data Details</h3>
-
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Sl No.</th>
-                    <th style={styles.th}>Submitted By</th>
-                    <th style={styles.th}>Date of Submission</th>
-                    <th style={styles.th}>Function</th>
-                    <th style={styles.th}>Status</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredRows.map((row, index) => (
-                    <tr key={index}>
-                      <td style={styles.td}>{row["Sl No."] || index + 1}</td>
-                      <td style={styles.td}>{getSubmittedBy(row) || "-"}</td>
-                      <td style={styles.td}>
-                        {row["Date of Submission"] ||
-                          row["Submission Date"] ||
-                          row["Submitted Date"] ||
-                          row["Date"] ||
-                          "-"}
-                      </td>
-                      <td style={styles.td}>{getFunction(row) || "-"}</td>
-                      <td style={styles.td}>{getStatus(row) || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {!filteredRows.length && (
-                <p style={styles.emptyText}>No submission data found.</p>
-              )}
-            </div>
-          </div>
-        </>
+          ))}
+        </div>
       )}
     </>
   );
 }
 
 const styles = {
+  errorBox: {
+    background: "#fee2e2",
+    color: "#991b1b",
+    border: "1px solid #fecaca",
+    padding: "14px 16px",
+    borderRadius: "14px",
+    margin: "18px 0",
+    fontWeight: "700",
+  },
+
   filterBar: {
     display: "flex",
     gap: "12px",
@@ -539,46 +380,27 @@ const styles = {
     padding: "14px",
     background: "#ffffff",
     borderRadius: "18px",
-    boxShadow: "0 4px 16px rgba(34,197,94,0.08)",
     border: "1px solid #bbf7d0",
   },
 
   select: {
     height: "42px",
-    minWidth: "190px",
+    minWidth: "220px",
     padding: "0 12px",
     borderRadius: "12px",
     border: "1px solid #bbf7d0",
     background: "#f9fafb",
-    color: "#111827",
-    fontSize: "14px",
     fontWeight: "700",
-    outline: "none",
   },
 
   input: {
     height: "42px",
+    minWidth: "180px",
     padding: "0 12px",
     borderRadius: "12px",
     border: "1px solid #bbf7d0",
     background: "#f9fafb",
-    color: "#111827",
-    fontSize: "14px",
     fontWeight: "700",
-    outline: "none",
-  },
-
-  search: {
-    height: "42px",
-    minWidth: "240px",
-    padding: "0 12px",
-    borderRadius: "12px",
-    border: "1px solid #bbf7d0",
-    background: "#f9fafb",
-    color: "#111827",
-    fontSize: "14px",
-    fontWeight: "700",
-    outline: "none",
   },
 
   refreshBtn: {
@@ -588,59 +410,18 @@ const styles = {
     borderRadius: "12px",
     background: "#16a34a",
     color: "#ffffff",
-    fontSize: "14px",
     fontWeight: "800",
     cursor: "pointer",
   },
 
-  reportCard: {
-    marginTop: "26px",
+  clearBtn: {
+    height: "42px",
+    padding: "0 20px",
+    border: "1px solid #16a34a",
+    borderRadius: "12px",
     background: "#ffffff",
-    borderRadius: "22px",
-    padding: "20px",
-    border: "1px solid #bbf7d0",
-    boxShadow: "0 4px 18px rgba(34,197,94,0.10)",
-  },
-
-  reportTitle: {
-    margin: "0 0 16px",
-    fontSize: "20px",
-    fontWeight: "900",
     color: "#14532d",
-  },
-
-  tableWrap: {
-    width: "100%",
-    overflowX: "auto",
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    minWidth: "850px",
-  },
-
-  th: {
-    background: "#dcfce7",
-    color: "#14532d",
-    padding: "13px",
-    textAlign: "left",
-    fontSize: "14px",
-    fontWeight: "900",
-    borderBottom: "1px solid #bbf7d0",
-  },
-
-  td: {
-    padding: "12px 13px",
-    borderBottom: "1px solid #e5e7eb",
-    color: "#111827",
-    fontSize: "14px",
-    fontWeight: "600",
-  },
-
-  emptyText: {
-    marginTop: "16px",
-    color: "#6b7280",
-    fontWeight: "700",
+    fontWeight: "800",
+    cursor: "pointer",
   },
 };
