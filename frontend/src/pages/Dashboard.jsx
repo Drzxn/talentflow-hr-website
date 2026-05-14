@@ -14,10 +14,8 @@ import {
 
 const valueLabelPlugin = {
   id: "valueLabelPlugin",
-
   afterDatasetsDraw(chart) {
     const { ctx } = chart;
-
     ctx.save();
 
     chart.data.datasets.forEach((dataset, datasetIndex) => {
@@ -76,10 +74,12 @@ ChartJS.register(
 const ENTITIES = [
   "All Entities",
   "Nambiar Ensemble residential Projects LLP",
-  "Sentries Construction LLP",
+  "Sentrise Construction LLP",
   "Nambiar Builders Private Limited",
   "Nambiar Builders LLP",
   "Nambiar Enterprises LLP",
+  "NB Club Bellezea",
+  "Chalukya Samrat",
 ];
 
 const FUNCTIONS = [
@@ -137,13 +137,23 @@ export default function Dashboard() {
 
   const cleanText = (value) => String(value || "").trim();
 
+  const normalizeEntity = (value) => {
+    const text = cleanText(value);
+
+    if (text.toLowerCase() === "sentries construction llp") {
+      return "Sentrise Construction LLP";
+    }
+
+    return text;
+  };
+
   const getEntity = (item) => {
     return (
-      cleanText(item["Entity"]) ||
-      cleanText(item["Entities"]) ||
-      cleanText(item["Company"]) ||
-      cleanText(item["Company Name"]) ||
-      cleanText(item["Business Entity"]) ||
+      normalizeEntity(item["Entity"]) ||
+      normalizeEntity(item["Entities"]) ||
+      normalizeEntity(item["Company"]) ||
+      normalizeEntity(item["Company Name"]) ||
+      normalizeEntity(item["Business Entity"]) ||
       "Unknown"
     );
   };
@@ -156,22 +166,18 @@ export default function Dashboard() {
 
     if (typeof value === "string" && value.includes("-")) {
       const parts = value.split("-");
-
       if (parts.length === 3) {
         const [dd, mm, yyyy] = parts;
         const d = new Date(`${yyyy}-${mm}-${dd}`);
-
         if (!Number.isNaN(d.getTime())) return d;
       }
     }
 
     if (typeof value === "string" && value.includes("/")) {
       const parts = value.split("/");
-
       if (parts.length === 3) {
         const [dd, mm, yyyy] = parts;
         const d = new Date(`${yyyy}-${mm}-${dd}`);
-
         if (!Number.isNaN(d.getTime())) return d;
       }
     }
@@ -223,7 +229,6 @@ export default function Dashboard() {
     if (selectedTime === "Yesterday") {
       const y = new Date(today);
       y.setDate(y.getDate() - 1);
-
       from = startOfDay(y);
       to = endOfDay(y);
     }
@@ -232,7 +237,6 @@ export default function Dashboard() {
       const d = new Date(today);
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-
       from = startOfDay(new Date(d.setDate(diff)));
       to = endOfDay(today);
     }
@@ -255,7 +259,6 @@ export default function Dashboard() {
 
     if (selectedTime === "Custom Range") {
       if (!customFrom || !customTo) return true;
-
       from = startOfDay(new Date(customFrom));
       to = endOfDay(new Date(customTo));
     }
@@ -312,7 +315,14 @@ export default function Dashboard() {
     return filteredJobs.reduce(
       (acc, item) => {
         acc.total += toNumber(item["Total Positions"]);
-        acc.joined += toNumber(item["Joined"]);
+
+        acc.closed += toNumber(
+          item["Closed"] ||
+            item["Joined"] ||
+            item["Total Closed"] ||
+            item["Closed Positions"]
+        );
+
         acc.ytj += toNumber(item["Yet to join"]);
         acc.open += toNumber(item["Open Number"]);
         acc.hold += toNumber(item["On Hold"]);
@@ -322,18 +332,11 @@ export default function Dashboard() {
         );
         acc.closedByTATeam += toNumber(item["Closed by TA Team"]);
 
-        const status = String(item["Status"] || "").trim().toLowerCase();
-
-        if (status.includes("offer accepted")) {
-          acc.accepted += toNumber(item["Yet to join"]) || 1;
-        }
-
         return acc;
       },
       {
         total: 0,
-        joined: 0,
-        accepted: 0,
+        closed: 0,
         ytj: 0,
         open: 0,
         hold: 0,
@@ -346,19 +349,18 @@ export default function Dashboard() {
 
   const cards = [
     ["Total Positions", summary.total, "From selected filters", "c1"],
-    ["Joined", summary.joined, "Live sheet count", "c2"],
-    ["Offer Accepted", summary.accepted, "Accepted candidates", "c3"],
-    ["Yet to Join", summary.ytj, "Pending joining", "c4"],
-    ["Open Number", summary.open, "Current openings", "c5"],
-    ["On Hold", summary.hold, "Hold positions", "c6"],
-    ["Closed by Vendors", summary.closedByVendors, "Vendor closed", "c7"],
+    ["Closed", summary.closed, "Live sheet count", "c2"],
+    ["Yet to Join", summary.ytj, "Pending joining", "c3"],
+    ["Open Number", summary.open, "Current openings", "c4"],
+    ["On Hold", summary.hold, "Hold positions", "c5"],
+    ["Closed by Vendors", summary.closedByVendors, "Vendor closed", "c6"],
     [
       "Closed by Internal referral",
       summary.closedByInternalReferral,
       "Internal referral closure",
-      "c8",
+      "c7",
     ],
-    ["Closed by TA Team", summary.closedByTATeam, "TA team closure", "c1"],
+    ["Closed by TA Team", summary.closedByTATeam, "TA team closure", "c8"],
   ];
 
   const functionSummary = useMemo(() => {
@@ -387,7 +389,6 @@ export default function Dashboard() {
 
   const barData = {
     labels: functionSummary.map(([name]) => name),
-
     datasets: [
       {
         label: "Total Positions",
@@ -401,7 +402,6 @@ export default function Dashboard() {
 
   const entityBarData = {
     labels: entitySummary.map(([name]) => name),
-
     datasets: [
       {
         label: "Entity Positions",
@@ -415,7 +415,7 @@ export default function Dashboard() {
 
   const pieData = {
     labels: [
-      "Joined",
+      "Closed",
       "Yet to Join",
       "Open",
       "On Hold",
@@ -423,11 +423,10 @@ export default function Dashboard() {
       "Internal Referral",
       "TA Team",
     ],
-
     datasets: [
       {
         data: [
-          summary.joined,
+          summary.closed,
           summary.ytj,
           summary.open,
           summary.hold,
@@ -435,7 +434,6 @@ export default function Dashboard() {
           summary.closedByInternalReferral,
           summary.closedByTATeam,
         ],
-
         backgroundColor: [
           "#22c55e",
           "#f59e0b",
@@ -445,7 +443,6 @@ export default function Dashboard() {
           "#14b8a6",
           "#ec4899",
         ],
-
         hoverBackgroundColor: [
           "#22c55e",
           "#f59e0b",
@@ -455,7 +452,6 @@ export default function Dashboard() {
           "#14b8a6",
           "#ec4899",
         ],
-
         borderWidth: 0,
         hoverOffset: 0,
       },
@@ -466,121 +462,60 @@ export default function Dashboard() {
     responsive: true,
     maintainAspectRatio: false,
     events: [],
-
     plugins: {
-      tooltip: {
-        enabled: false,
-      },
-
-      legend: {
-        display: true,
-      },
+      tooltip: { enabled: false },
+      legend: { display: true },
     },
-
-    animation: {
-      duration: 0,
-    },
+    animation: { duration: 0 },
   };
 
   const barOptions = {
     ...commonOptions,
-
-    layout: {
-      padding: {
-        top: 28,
-      },
-    },
-
+    layout: { padding: { top: 28 } },
     plugins: {
-      tooltip: {
-        enabled: false,
-      },
-
-      legend: {
-        display: false,
-      },
+      tooltip: { enabled: false },
+      legend: { display: false },
     },
-
     scales: {
       x: {
-        ticks: {
-          font: {
-            size: 10,
-          },
-        },
-
-        grid: {
-          display: false,
-        },
+        ticks: { font: { size: 10 } },
+        grid: { display: false },
       },
-
       y: {
         beginAtZero: true,
         grace: "15%",
-
-        ticks: {
-          precision: 0,
-
-          font: {
-            size: 10,
-          },
-        },
+        ticks: { precision: 0, font: { size: 10 } },
       },
     },
   };
 
   const entityBarOptions = {
     ...barOptions,
-
     indexAxis: "y",
-
     scales: {
       x: {
         beginAtZero: true,
         grace: "15%",
-
-        ticks: {
-          precision: 0,
-          font: {
-            size: 10,
-          },
-        },
+        ticks: { precision: 0, font: { size: 10 } },
       },
-
       y: {
-        ticks: {
-          font: {
-            size: 10,
-          },
-        },
-
-        grid: {
-          display: false,
-        },
+        ticks: { font: { size: 10 } },
+        grid: { display: false },
       },
     },
   };
 
   const doughnutOptions = {
     ...commonOptions,
-
     cutout: "68%",
-
     plugins: {
-      tooltip: {
-        enabled: false,
-      },
-
+      tooltip: { enabled: false },
       legend: {
         position: "bottom",
-
         labels: {
           boxWidth: 12,
           padding: 12,
-
-          font: {
-            size: 11,
-          },
+          font: { size: 11 },
         },
       },
     },

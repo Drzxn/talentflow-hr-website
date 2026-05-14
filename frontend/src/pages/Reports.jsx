@@ -19,33 +19,9 @@ ChartJS.register(
   Legend
 );
 
-const FUNCTIONS = [
-  "All Functions",
-  "Execution",
-  "Interiors & Finishing",
-  "Sales",
-  "Projects",
-  "Finance & Accounts",
-  "QA/QC",
-  "QS Department",
-  "Store Execution",
-  "MEP",
-  "Administration",
-  "CRM",
-  "Legal",
-  "Planning",
-  "IT",
-  "Marketing",
-  "Design",
-  "HSE",
-  "Presales",
-  "Audit",
-  "Sales & Marketing",
-  "Operations",
-  "Execution - Plant & Machinery",
-  "Structural Design",
-  "Purchase",
-];
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://talentflow-hr-website-1jga.onrender.com";
 
 const DASHBOARD_FILTERS = [
   "All Dashboard",
@@ -73,11 +49,11 @@ const TIME_FILTERS = [
 export default function Reports() {
   const [jobs, setJobs] = useState([]);
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
-  const [selectedDashboard, setSelectedDashboard] =
-    useState("All Dashboard");
+  const [selectedDashboard, setSelectedDashboard] = useState("All Dashboard");
   const [selectedTime, setSelectedTime] = useState("All Time");
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
   const [maximizedChart, setMaximizedChart] = useState(null);
 
@@ -86,11 +62,62 @@ export default function Reports() {
     return Number.isNaN(num) ? 0 : num;
   };
 
+  const getValue = (item, keys) => {
+    for (const key of keys) {
+      if (item?.[key] !== undefined && item?.[key] !== null) {
+        return item[key];
+      }
+    }
+    return "";
+  };
+
+  const getFunction = (item) =>
+    String(getValue(item, ["Function", "Department", "FUNCTION"]) || "").trim();
+
+  const getDesignation = (item) =>
+    String(getValue(item, ["Designation", "Role", "Position"]) || "").trim();
+
+  const getStatus = (item) =>
+    String(getValue(item, ["Status", "STATUS"]) || "").trim();
+
+  const getCreatedDate = (item) =>
+    getValue(item, ["Created Date", "CreatedAt", "Date", "Opening Date"]);
+
+  const getClosedDate = (item) =>
+    getValue(item, ["Closed Date", "ClosedAt", "Closing Date"]);
+
+  const getTotalPositions = (item) =>
+    toNumber(getValue(item, ["Total Positions", "Total Position", "Total"]));
+
+  const getJoined = (item) => toNumber(getValue(item, ["Joined"]));
+
+  const getYTJ = (item) =>
+    toNumber(getValue(item, ["Yet to join", "Yet to Join", "YTJ"]));
+
+  const getOpen = (item) =>
+    toNumber(getValue(item, ["Open Number", "Open", "Openings"]));
+
+  const getHold = (item) => toNumber(getValue(item, ["On Hold", "Hold"]));
+
+  const getVendors = (item) =>
+    toNumber(getValue(item, ["Closed by vendors", "Closed by Vendors"]));
+
+  const getInternal = (item) =>
+    toNumber(
+      getValue(item, [
+        "Closed by Internal referral",
+        "Closed by Internal Referral",
+        "Internal Referral",
+      ])
+    );
+
+  const getTA = (item) =>
+    toNumber(getValue(item, ["Closed by TA Team", "TA Team"]));
+
   const parseDate = (value) => {
     if (!value) return null;
 
     const text = String(value).trim();
-
     const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
 
     if (match) {
@@ -117,9 +144,6 @@ export default function Reports() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
     return dates.some((date) => {
       const d = new Date(date);
       d.setHours(0, 0, 0, 0);
@@ -137,82 +161,127 @@ export default function Reports() {
     });
   };
 
-  useEffect(() => {
-    loadReports();
-  }, []);
+  const removeSummaryRows = (data) => {
+    return data.filter((item) => {
+      if (!item) return false;
+
+      const slNo = String(getValue(item, ["Sl No.", "Sl No", "S No"]) || "")
+        .trim()
+        .toLowerCase();
+
+      const designation = getDesignation(item);
+      const fn = getFunction(item);
+      const status = getStatus(item);
+
+      if (slNo === "total" || slNo === "grand total") return false;
+
+      const isOnlyTotalRow = !slNo && !designation && !fn && !status;
+
+      if (isOnlyTotalRow) return false;
+
+      const hasNumbers =
+        getTotalPositions(item) ||
+        getJoined(item) ||
+        getYTJ(item) ||
+        getOpen(item) ||
+        getHold(item) ||
+        getVendors(item) ||
+        getInternal(item) ||
+        getTA(item);
+
+      return designation || fn || status || hasNumbers;
+    });
+  };
+
+  const extractRows = (result) => {
+    if (Array.isArray(result)) return result;
+    if (Array.isArray(result?.data)) return result.data;
+    if (Array.isArray(result?.reports)) return result.reports;
+    if (Array.isArray(result?.rows)) return result.rows;
+    if (Array.isArray(result?.data?.reports)) return result.data.reports;
+    if (Array.isArray(result?.data?.rows)) return result.data.rows;
+    return [];
+  };
 
   const loadReports = async () => {
     try {
       setLoading(true);
+      setErrorMsg("");
 
-      const res = await fetch(
-        "https://talentflow-hr-website-1jga.onrender.com/api/hospitality/dashboard"
-      );
-      const result = await res.json();
+      const urls = [`${API_BASE}/api/sheets/reports`, `${API_BASE}/api/sheets/dashboard`];
 
-      setJobs(result.data || []);
+      let finalRows = [];
+
+      for (const url of urls) {
+        const res = await fetch(url);
+        const result = await res.json();
+
+        const rows = extractRows(result);
+
+        if (rows.length > 0) {
+          finalRows = rows;
+          break;
+        }
+      }
+
+      const cleanRows = removeSummaryRows(finalRows);
+
+      setJobs(cleanRows);
+
+      if (cleanRows.length === 0) {
+        setErrorMsg("No reports data found from backend API.");
+      }
     } catch (error) {
       console.log("REPORT LOAD ERROR:", error);
       setJobs([]);
+      setErrorMsg("Unable to load reports data. Check backend API.");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  const functions = useMemo(() => {
+    const list = jobs.map(getFunction).filter(Boolean);
+    return ["All Functions", ...Array.from(new Set(list)).sort()];
+  }, [jobs]);
+
   const filteredJobs = useMemo(() => {
-    let rows = jobs.filter((item) => item["Sl No."] !== "Total");
+    let rows = [...jobs];
 
     if (selectedFunction !== "All Functions") {
-      rows = rows.filter(
-        (item) => String(item["Function"] || "").trim() === selectedFunction
-      );
+      rows = rows.filter((item) => getFunction(item) === selectedFunction);
     }
 
     rows = rows.filter((item) =>
-      isWithinTime(item["Created Date"], item["Closed Date"])
+      isWithinTime(getCreatedDate(item), getClosedDate(item))
     );
 
     if (selectedDashboard !== "All Dashboard") {
       rows = rows.filter((item) => {
-        if (selectedDashboard === "Total Positions") {
-          return toNumber(item["Total Positions"]) > 0;
-        }
+        if (selectedDashboard === "Total Positions")
+          return getTotalPositions(item) > 0;
 
-        if (selectedDashboard === "Joined") {
-          return toNumber(item["Joined"]) > 0;
-        }
+        if (selectedDashboard === "Joined") return getJoined(item) > 0;
 
         if (selectedDashboard === "Offer Accepted") {
           return (
-            String(item["Status"] || "")
-              .toLowerCase()
-              .includes("offer accepted") || toNumber(item["Yet to join"]) > 0
+            getStatus(item).toLowerCase().includes("offer accepted") ||
+            getYTJ(item) > 0
           );
         }
 
-        if (selectedDashboard === "Yet to Join") {
-          return toNumber(item["Yet to join"]) > 0;
-        }
-
-        if (selectedDashboard === "Open Number") {
-          return toNumber(item["Open Number"]) > 0;
-        }
-
-        if (selectedDashboard === "On Hold") {
-          return toNumber(item["On Hold"]) > 0;
-        }
-
-        if (selectedDashboard === "Closed by Vendors") {
-          return toNumber(item["Closed by vendors"]) > 0;
-        }
-
-        if (selectedDashboard === "Closed by Internal referral") {
-          return toNumber(item["Closed by Internal referral"]) > 0;
-        }
-
-        if (selectedDashboard === "Closed by TA Team") {
-          return toNumber(item["Closed by TA Team"]) > 0;
-        }
+        if (selectedDashboard === "Yet to Join") return getYTJ(item) > 0;
+        if (selectedDashboard === "Open Number") return getOpen(item) > 0;
+        if (selectedDashboard === "On Hold") return getHold(item) > 0;
+        if (selectedDashboard === "Closed by Vendors")
+          return getVendors(item) > 0;
+        if (selectedDashboard === "Closed by Internal referral")
+          return getInternal(item) > 0;
+        if (selectedDashboard === "Closed by TA Team") return getTA(item) > 0;
 
         return true;
       });
@@ -223,11 +292,11 @@ export default function Reports() {
 
       rows = rows.filter((item) =>
         [
-          item["Designation"],
-          item["Function"],
-          item["Status"],
-          item["Created Date"],
-          item["Closed Date"],
+          getDesignation(item),
+          getFunction(item),
+          getStatus(item),
+          getCreatedDate(item),
+          getClosedDate(item),
         ]
           .join(" ")
           .toLowerCase()
@@ -236,30 +305,24 @@ export default function Reports() {
     }
 
     return rows;
-  }, [
-    jobs,
-    selectedFunction,
-    selectedDashboard,
-    selectedTime,
-    searchText,
-  ]);
+  }, [jobs, selectedFunction, selectedDashboard, selectedTime, searchText]);
 
   const summary = useMemo(() => {
     return filteredJobs.reduce(
       (acc, item) => {
-        const status = String(item["Status"] || "").trim().toLowerCase();
+        const status = getStatus(item).toLowerCase();
 
-        acc.total += toNumber(item["Total Positions"]);
-        acc.joined += toNumber(item["Joined"]);
-        acc.ytj += toNumber(item["Yet to join"]);
-        acc.open += toNumber(item["Open Number"]);
-        acc.hold += toNumber(item["On Hold"]);
-        acc.vendors += toNumber(item["Closed by vendors"]);
-        acc.internal += toNumber(item["Closed by Internal referral"]);
-        acc.ta += toNumber(item["Closed by TA Team"]);
+        acc.total += getTotalPositions(item);
+        acc.joined += getJoined(item);
+        acc.ytj += getYTJ(item);
+        acc.open += getOpen(item);
+        acc.hold += getHold(item);
+        acc.vendors += getVendors(item);
+        acc.internal += getInternal(item);
+        acc.ta += getTA(item);
 
         if (status.includes("offer accepted")) {
-          acc.accepted += toNumber(item["Yet to join"]) || 1;
+          acc.accepted += getYTJ(item) || 1;
         }
 
         return acc;
@@ -282,8 +345,8 @@ export default function Reports() {
     const map = {};
 
     filteredJobs.forEach((item) => {
-      const fn = String(item["Function"] || "Unknown").trim();
-      map[fn] = (map[fn] || 0) + toNumber(item["Total Positions"]);
+      const fn = getFunction(item) || "Unknown";
+      map[fn] = (map[fn] || 0) + getTotalPositions(item);
     });
 
     return Object.entries(map)
@@ -317,7 +380,7 @@ export default function Reports() {
           summary.internal,
           summary.ta,
         ],
-        backgroundColor: "#6c63ff",
+        backgroundColor: "#16a34a",
         borderRadius: 6,
       },
     ],
@@ -373,6 +436,17 @@ export default function Reports() {
     ],
   };
 
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    events: [],
+    plugins: {
+      tooltip: { enabled: false },
+      legend: { display: true },
+    },
+    animation: { duration: 0 },
+  };
+
   const exportCSV = () => {
     const rows = [
       [
@@ -392,20 +466,20 @@ export default function Reports() {
         "Closed by TA Team",
       ],
       ...filteredJobs.map((r) => [
-        r["Sl No."] || "",
-        r["Designation"] || "",
-        r["Function"] || "",
-        r["Created Date"] || "",
-        r["Closed Date"] || "",
-        r["Status"] || "",
-        r["Total Positions"] || "",
-        r["Joined"] || "",
-        r["Yet to join"] || "",
-        r["Open Number"] || "",
-        r["On Hold"] || "",
-        r["Closed by vendors"] || "",
-        r["Closed by Internal referral"] || "",
-        r["Closed by TA Team"] || "",
+        getValue(r, ["Sl No.", "Sl No", "S No"]) || "",
+        getDesignation(r),
+        getFunction(r),
+        getCreatedDate(r) || "",
+        getClosedDate(r) || "",
+        getStatus(r),
+        getTotalPositions(r),
+        getJoined(r),
+        getYTJ(r),
+        getOpen(r),
+        getHold(r),
+        getVendors(r),
+        getInternal(r),
+        getTA(r),
       ]),
     ];
 
@@ -417,7 +491,7 @@ export default function Reports() {
 
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = "reports.csv";
+    a.download = "nb-reports.csv";
     a.click();
   };
 
@@ -427,13 +501,7 @@ export default function Reports() {
     if (type === "bar") {
       return (
         <div style={{ height: chartHeight }}>
-          <Bar
-            data={statusBarData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-            }}
-          />
+          <Bar data={statusBarData} options={chartOptions} />
         </div>
       );
     }
@@ -441,36 +509,24 @@ export default function Reports() {
     if (type === "pie") {
       return (
         <div style={{ height: chartHeight }}>
-          <Doughnut
-            data={statusPieData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-            }}
-          />
+          <Doughnut data={statusPieData} options={chartOptions} />
         </div>
       );
     }
 
     return (
       <div style={{ height: chartHeight }}>
-        <Bar
-          data={functionBarData}
-          options={{
-            responsive: true,
-            maintainAspectRatio: false,
-          }}
-        />
+        <Bar data={functionBarData} options={chartOptions} />
       </div>
     );
   };
 
   return (
     <>
-      <h1 className="page-title">Reports</h1>
+      <h1 className="page-title">NB Reports</h1>
 
       <p className="page-subtitle">
-        Live Google Sheets recruitment data.
+        Live Google Sheets recruitment data from NB Reports.
       </p>
 
       <div className="report-filters">
@@ -479,7 +535,7 @@ export default function Reports() {
           value={selectedFunction}
           onChange={(e) => setSelectedFunction(e.target.value)}
         >
-          {FUNCTIONS.map((item) => (
+          {functions.map((item) => (
             <option key={item} value={item}>
               {item}
             </option>
@@ -528,7 +584,17 @@ export default function Reports() {
         <button className="export-btn" onClick={exportCSV}>
           Export CSV
         </button>
+
+        <button className="export-btn" onClick={loadReports}>
+          Refresh
+        </button>
       </div>
+
+      {errorMsg && (
+        <p style={{ color: "red", fontWeight: "700", marginBottom: "16px" }}>
+          {errorMsg}
+        </p>
+      )}
 
       {showDashboard && (
         <div className="charts-grid" style={{ marginBottom: "24px" }}>
@@ -613,7 +679,7 @@ export default function Reports() {
 
       <div className="reports-table">
         <div className="table-header">
-          <h3>Recruitment Reports</h3>
+          <h3>NB Recruitment Reports</h3>
           <span>{filteredJobs.length} Records</span>
         </div>
 
@@ -652,20 +718,20 @@ export default function Reports() {
               ) : (
                 filteredJobs.map((r, index) => (
                   <tr key={index}>
-                    <td>{r["Sl No."]}</td>
+                    <td>{getValue(r, ["Sl No.", "Sl No", "S No"])}</td>
                     <td>
-                      <strong>{r["Designation"]}</strong>
+                      <strong>{getDesignation(r)}</strong>
                     </td>
-                    <td>{r["Function"]}</td>
-                    <td>{r["Status"]}</td>
-                    <td>{r["Total Positions"]}</td>
-                    <td>{r["Joined"]}</td>
-                    <td>{r["Yet to join"]}</td>
-                    <td>{r["Open Number"]}</td>
-                    <td>{r["On Hold"]}</td>
-                    <td>{r["Closed by vendors"]}</td>
-                    <td>{r["Closed by Internal referral"]}</td>
-                    <td>{r["Closed by TA Team"]}</td>
+                    <td>{getFunction(r)}</td>
+                    <td>{getStatus(r)}</td>
+                    <td>{getTotalPositions(r)}</td>
+                    <td>{getJoined(r)}</td>
+                    <td>{getYTJ(r)}</td>
+                    <td>{getOpen(r)}</td>
+                    <td>{getHold(r)}</td>
+                    <td>{getVendors(r)}</td>
+                    <td>{getInternal(r)}</td>
+                    <td>{getTA(r)}</td>
                   </tr>
                 ))
               )}

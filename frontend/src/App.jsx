@@ -7,6 +7,10 @@ import Reports from "./pages/Reports";
 import HospitalityDashboard from "./pages/HospitalityDashboard";
 import HospitalityReports from "./pages/HospitalityReports";
 
+import SubmissionData from "./pages/SubmissionData";
+import InternshipData from "./pages/InternshipData";
+import OffersData from "./pages/OffersData";
+
 import "./index.css";
 
 export default function App() {
@@ -16,6 +20,15 @@ export default function App() {
     switch (page) {
       case "reports":
         return <Reports />;
+
+      case "submission-data":
+        return <SubmissionData />;
+
+      case "internship-data":
+        return <InternshipData />;
+
+      case "offers-data":
+        return <OffersData />;
 
       case "hospitality":
         return <HospitalityDashboard />;

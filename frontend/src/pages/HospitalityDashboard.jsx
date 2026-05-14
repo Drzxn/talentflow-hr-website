@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 import { Bar, Doughnut } from "react-chartjs-2";
 
@@ -21,8 +21,11 @@ ChartJS.register(
   Legend
 );
 
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://talentflow-hr-website-1jga.onrender.com";
+
 const DEFAULT_ENTITIES = ["NB Club Bellezea", "Chalukya Samrat"];
-const DEFAULT_FUNCTIONS = ["HR"];
 
 export default function HospitalityDashboard() {
   const [rows, setRows] = useState([]);
@@ -34,6 +37,8 @@ export default function HospitalityDashboard() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
+  const didLoad = useRef(false);
+
   const toNumber = (value) => {
     const num = Number(value || 0);
     return Number.isNaN(num) ? 0 : num;
@@ -42,43 +47,66 @@ export default function HospitalityDashboard() {
   const parseDate = (value) => {
     if (!value) return null;
 
-    const d = new Date(value);
-    if (!Number.isNaN(d.getTime())) return d;
+    const text = String(value).trim();
+    const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
 
-    if (typeof value === "string" && value.includes("-")) {
-      const parts = value.split("-");
-      if (parts.length === 3) {
-        const [dd, mm, yyyy] = parts;
-        const parsed = new Date(`${yyyy}-${mm}-${dd}`);
-        if (!Number.isNaN(parsed.getTime())) return parsed;
-      }
+    if (match) {
+      const day = Number(match[1]);
+      const month = Number(match[2]) - 1;
+      const year = Number(match[3]);
+      const date = new Date(year, month, day);
+      return Number.isNaN(date.getTime()) ? null : date;
     }
 
-    return null;
+    const d = new Date(text);
+    return Number.isNaN(d.getTime()) ? null : d;
   };
 
   const getEntity = (item) =>
     String(
       item["Entity"] ||
-      item["Entities"] ||
-      item["Project"] ||
-      item["Property"] ||
-      item["Hotel"] ||
-      item["Unit"] ||
-      "Unknown"
+        item["Entities"] ||
+        item["Project"] ||
+        item["Property"] ||
+        item["Hotel"] ||
+        item["Unit"] ||
+        ""
     ).trim();
 
   const getFunction = (item) =>
-    String(item["Function"] || item["Department"] || "Unknown").trim();
+    String(item["Function"] || item["Department"] || "").trim();
+
+  const removeSummaryAndEmptyRows = (data) => {
+    return data.filter((item) => {
+      if (!item) return false;
+
+      const slNo = String(item["Sl No."] || "").trim();
+      const designation = String(item["Designation"] || "").trim();
+      const fn = getFunction(item);
+      const entity = getEntity(item);
+      const status = String(item["Status"] || "").trim();
+
+      const isOnlyTotalNumberRow =
+        !slNo && !designation && !fn && !entity && !status;
+
+      if (isOnlyTotalNumberRow) return false;
+      if (!designation && !fn && !entity) return false;
+
+      return true;
+    });
+  };
 
   const loadHospitality = async () => {
     try {
       setLoading(true);
-      const res = await fetch(
-        "https://talentflow-hr-website-1jga.onrender.com/api/hospitality/dashboard"
-      );
+
+      const res = await fetch(`${API_BASE}/api/hospitality/dashboard`);
       const result = await res.json();
-      setRows(Array.isArray(result.data) ? result.data : []);
+
+      const rawRows = Array.isArray(result.data) ? result.data : [];
+      const cleanRows = removeSummaryAndEmptyRows(rawRows);
+
+      setRows(cleanRows);
     } catch (error) {
       console.log("HOSPITALITY DASHBOARD ERROR:", error);
       setRows([]);
@@ -88,17 +116,23 @@ export default function HospitalityDashboard() {
   };
 
   useEffect(() => {
+    if (didLoad.current) return;
+    didLoad.current = true;
     loadHospitality();
   }, []);
 
   const entities = useMemo(() => {
     const sheetEntities = rows.map(getEntity).filter(Boolean);
-    return ["All", ...Array.from(new Set([...DEFAULT_ENTITIES, ...sheetEntities])).sort()];
+
+    return [
+      "All",
+      ...Array.from(new Set([...DEFAULT_ENTITIES, ...sheetEntities])).sort(),
+    ];
   }, [rows]);
 
   const functions = useMemo(() => {
     const sheetFunctions = rows.map(getFunction).filter(Boolean);
-    return ["All", ...Array.from(new Set([...DEFAULT_FUNCTIONS, ...sheetFunctions])).sort()];
+    return ["All", ...Array.from(new Set(sheetFunctions)).sort()];
   }, [rows]);
 
   const filteredRows = useMemo(() => {
@@ -108,9 +142,7 @@ export default function HospitalityDashboard() {
       const entity = getEntity(item);
       const fn = getFunction(item);
 
-      const entityMatch =
-        selectedEntity === "All" || entity === selectedEntity;
-
+      const entityMatch = selectedEntity === "All" || entity === selectedEntity;
       const functionMatch =
         selectedFunction === "All" || fn === selectedFunction;
 
@@ -139,9 +171,9 @@ export default function HospitalityDashboard() {
             rowDate.getFullYear() === now.getFullYear();
         }
 
-        if (timeFilter === "7days") timeMatch = diffDays <= 7;
-        if (timeFilter === "30days") timeMatch = diffDays <= 30;
-        if (timeFilter === "90days") timeMatch = diffDays <= 90;
+        if (timeFilter === "7days") timeMatch = diffDays >= 0 && diffDays <= 7;
+        if (timeFilter === "30days") timeMatch = diffDays >= 0 && diffDays <= 30;
+        if (timeFilter === "90days") timeMatch = diffDays >= 0 && diffDays <= 90;
 
         if (timeFilter === "custom") {
           const fromDate = customFrom ? new Date(customFrom) : null;
@@ -151,8 +183,6 @@ export default function HospitalityDashboard() {
 
           if (fromDate && rowDate < fromDate) timeMatch = false;
           if (toDate && rowDate > toDate) timeMatch = false;
-
-          if (!fromDate && !toDate) timeMatch = true;
         }
       }
 
@@ -164,18 +194,27 @@ export default function HospitalityDashboard() {
     return filteredRows.reduce(
       (acc, item) => {
         acc.totalPositions += toNumber(item["Total Positions"]);
-        acc.joined += toNumber(item["Joined"]);
+
+        // Joined replaced with Closed
+        acc.closed += toNumber(
+          item["Closed"] ||
+            item["Joined"] ||
+            item["Total Closed"] ||
+            item["Closed Positions"]
+        );
+
         acc.ytj += toNumber(item["Yet to join"]);
         acc.open += toNumber(item["Open Number"]);
         acc.hold += toNumber(item["On Hold"]);
         acc.vendor += toNumber(item["Closed by vendors"]);
         acc.referral += toNumber(item["Closed by Internal referral"]);
         acc.ta += toNumber(item["Closed by TA Team"]);
+
         return acc;
       },
       {
         totalPositions: 0,
-        joined: 0,
+        closed: 0,
         ytj: 0,
         open: 0,
         hold: 0,
@@ -188,7 +227,7 @@ export default function HospitalityDashboard() {
 
   const cards = [
     ["Total Positions", summary.totalPositions, "Hospitality sheet count", "c1"],
-    ["Joined", summary.joined, "Joined candidates", "c2"],
+    ["Closed", summary.closed, "Closed candidates", "c2"],
     ["Yet to Join", summary.ytj, "Pending joining", "c3"],
     ["Open Number", summary.open, "Current openings", "c4"],
     ["On Hold", summary.hold, "Hold positions", "c5"],
@@ -201,7 +240,7 @@ export default function HospitalityDashboard() {
     const map = {};
 
     filteredRows.forEach((item) => {
-      const fn = getFunction(item);
+      const fn = getFunction(item) || "Unknown";
       map[fn] = (map[fn] || 0) + toNumber(item["Total Positions"]);
     });
 
@@ -224,7 +263,7 @@ export default function HospitalityDashboard() {
 
   const pieData = {
     labels: [
-      "Joined",
+      "Closed",
       "Yet to Join",
       "Open",
       "On Hold",
@@ -235,7 +274,7 @@ export default function HospitalityDashboard() {
     datasets: [
       {
         data: [
-          summary.joined,
+          summary.closed,
           summary.ytj,
           summary.open,
           summary.hold,
