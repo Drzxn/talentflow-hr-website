@@ -1,4 +1,5 @@
 import express from "express";
+<<<<<<< HEAD
 import { google } from "googleapis";
 import fs from "fs";
 
@@ -176,19 +177,41 @@ router.get("/dashboard", async (req, res) => {
         process.env.GOOGLE_SHEET_RANGE,
         "Sheet1!A:Z",
       ].filter(Boolean),
+=======
+import { sheets } from "../config/googleSheets.js";
+
+const router = express.Router();
+
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+router.get("/dashboard", async (req, res) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: "Sheet1!A:Z",
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
     });
 
     res.json({
       success: true,
+<<<<<<< HEAD
       type: "dashboard",
       sheetId: process.env.GOOGLE_SHEET_ID,
       ...result,
     });
   } catch (error) {
+=======
+      data: response.data.values || [],
+    });
+  } catch (error) {
+    console.error("MAIN GOOGLE SHEET ERROR:", error);
+
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
     res.status(500).json({
       success: false,
       route: "/api/sheets/dashboard",
       error: error.message,
+<<<<<<< HEAD
       fix: "Check GOOGLE_SHEET_ID, GOOGLE_SHEET_RANGE, GOOGLE_SERVICE_ACCOUNT_JSON and Google Sheet permission.",
     });
   }
@@ -386,6 +409,8 @@ router.get("/all-data", async (req, res) => {
       route: "/api/sheets/all-data",
       error: error.message,
       fix: "Check all sheet IDs, ranges, GOOGLE_SERVICE_ACCOUNT_JSON and Google Sheet permission.",
+=======
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
     });
   }
 });

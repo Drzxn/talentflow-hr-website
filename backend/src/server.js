@@ -17,8 +17,11 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5000",
+<<<<<<< HEAD
   "https://talent-hr.netlify.app",
   "https://talentflow-hr-website-1jga.onrender.com",
+=======
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
   "https://talentflow-hr-website-1.onrender.com",
   "https://talentflow-hr-website.onrender.com",
   "https://talentflow-hr-website-m3yb.onrender.com",
@@ -31,7 +34,10 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
+<<<<<<< HEAD
 
+=======
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
       return callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     credentials: true,
@@ -43,10 +49,18 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 function mountRoute(path, route) {
   if (typeof route !== "function") {
+<<<<<<< HEAD
+=======
+    console.error(`❌ Route broken at ${path}. Expected function/router but got:`, typeof route);
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
     throw new Error(`Route import is invalid: ${path}`);
   }
 
   app.use(path, route);
+<<<<<<< HEAD
+=======
+  console.log(`✅ Mounted route: ${path}`);
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
 }
 
 app.get("/", (req, res) => {
@@ -72,9 +86,12 @@ app.get("/api/env-check", (req, res) => {
     GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON
       ? "SET"
       : "MISSING",
+<<<<<<< HEAD
     SUBMISSION_RANGE: process.env.SUBMISSION_RANGE || "MISSING",
     INTERNSHIP_RANGE: process.env.INTERNSHIP_RANGE || "MISSING",
     OFFER_RANGE: process.env.OFFER_RANGE || "MISSING",
+=======
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
   });
 });
 
@@ -84,6 +101,7 @@ mountRoute("/api/dashboard", dashboardRoutes);
 mountRoute("/api/reports", reportRoutes);
 mountRoute("/api/sheets", googleSheetRoutes);
 mountRoute("/api/hospitality", hospitalityRoutes);
+<<<<<<< HEAD
 
 app.get("/api/test", (req, res) => {
   res.json({
@@ -107,6 +125,8 @@ app.get("/api/test-sheets", (req, res) => {
     },
   });
 });
+=======
+>>>>>>> aa74b0b2b9064f2ba6483c7ee37856a507e21cec
 
 app.use((req, res) => {
   res.status(404).json({
