@@ -19,21 +19,21 @@ ChartJS.register(
   Legend
 );
 
-const API_BASE =
+const API_BASE = (
   import.meta.env.VITE_API_URL ||
-  "https://talentflow-hr-website-1jga.onrender.com";
+  "https://talentflow-hr-website-m3yb.onrender.com"
+).replace(/\/$/, "");
 
 const DASHBOARD_FILTERS = [
   "All Dashboard",
   "Total Positions",
   "Joined",
-  "Offer Accepted",
   "Yet to Join",
   "Open Number",
   "On Hold",
   "Closed by Vendors",
-  "Closed by Internal referral",
   "Closed by TA Team",
+  "Closed by Internal referral",
 ];
 
 const TIME_FILTERS = [
@@ -49,6 +49,7 @@ const TIME_FILTERS = [
 export default function Reports() {
   const [jobs, setJobs] = useState([]);
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
+  const [selectedEntity, setSelectedEntity] = useState("All Entities");
   const [selectedDashboard, setSelectedDashboard] = useState("All Dashboard");
   const [selectedTime, setSelectedTime] = useState("All Time");
   const [searchText, setSearchText] = useState("");
@@ -57,28 +58,27 @@ export default function Reports() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [maximizedChart, setMaximizedChart] = useState(null);
 
+  const clean = (value) => String(value ?? "").trim();
+
   const toNumber = (value) => {
-    const num = Number(value || 0);
-    return Number.isNaN(num) ? 0 : num;
+    const num = Number(clean(value).replace(/,/g, ""));
+    return Number.isFinite(num) ? num : 0;
   };
 
   const getValue = (item, keys) => {
     for (const key of keys) {
-      if (item?.[key] !== undefined && item?.[key] !== null) {
-        return item[key];
-      }
+      if (item?.[key] !== undefined && item?.[key] !== null) return item[key];
     }
     return "";
   };
 
-  const getFunction = (item) =>
-    String(getValue(item, ["Function", "Department", "FUNCTION"]) || "").trim();
-
+  const getSlNo = (item) => getValue(item, ["Sl No.", "Sl No", "S No"]);
   const getDesignation = (item) =>
-    String(getValue(item, ["Designation", "Role", "Position"]) || "").trim();
-
-  const getStatus = (item) =>
-    String(getValue(item, ["Status", "STATUS"]) || "").trim();
+    clean(getValue(item, ["Designation", "Role", "Position"]));
+  const getFunction = (item) =>
+    clean(getValue(item, ["Function", "Department", "FUNCTION"]));
+  const getEntity = (item) => clean(getValue(item, ["Entity", "ENTITY"]));
+  const getStatus = (item) => clean(getValue(item, ["Status", "STATUS"]));
 
   const getCreatedDate = (item) =>
     getValue(item, ["Created Date", "CreatedAt", "Date", "Opening Date"]);
@@ -102,6 +102,9 @@ export default function Reports() {
   const getVendors = (item) =>
     toNumber(getValue(item, ["Closed by vendors", "Closed by Vendors"]));
 
+  const getTA = (item) =>
+    toNumber(getValue(item, ["Closed by TA Team", "TA Team"]));
+
   const getInternal = (item) =>
     toNumber(
       getValue(item, [
@@ -111,25 +114,34 @@ export default function Reports() {
       ])
     );
 
-  const getTA = (item) =>
-    toNumber(getValue(item, ["Closed by TA Team", "TA Team"]));
-
   const parseDate = (value) => {
     if (!value) return null;
 
-    const text = String(value).trim();
-    const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-
-    if (match) {
-      const day = Number(match[1]);
-      const month = Number(match[2]) - 1;
-      const year = Number(match[3]);
-      const date = new Date(year, month, day);
+    if (typeof value === "number") {
+      const date = new Date(Math.round((value - 25569) * 86400 * 1000));
       return Number.isNaN(date.getTime()) ? null : date;
     }
 
-    const normalDate = new Date(text);
-    return Number.isNaN(normalDate.getTime()) ? null : normalDate;
+    const text = clean(value);
+    const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+
+    if (match) {
+      const date = new Date(
+        Number(match[3]),
+        Number(match[2]) - 1,
+        Number(match[1])
+      );
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    const date = new Date(text);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatDate = (value) => {
+    const date = parseDate(value);
+    if (!date) return clean(value);
+    return date.toLocaleDateString("en-IN");
   };
 
   const isWithinTime = (createdDate, closedDate) => {
@@ -161,46 +173,47 @@ export default function Reports() {
     });
   };
 
-  const removeSummaryRows = (data) => {
-    return data.filter((item) => {
-      if (!item) return false;
-
-      const slNo = String(getValue(item, ["Sl No.", "Sl No", "S No"]) || "")
-        .trim()
-        .toLowerCase();
-
-      const designation = getDesignation(item);
-      const fn = getFunction(item);
-      const status = getStatus(item);
-
-      if (slNo === "total" || slNo === "grand total") return false;
-
-      const isOnlyTotalRow = !slNo && !designation && !fn && !status;
-
-      if (isOnlyTotalRow) return false;
-
-      const hasNumbers =
-        getTotalPositions(item) ||
-        getJoined(item) ||
-        getYTJ(item) ||
-        getOpen(item) ||
-        getHold(item) ||
-        getVendors(item) ||
-        getInternal(item) ||
-        getTA(item);
-
-      return designation || fn || status || hasNumbers;
-    });
-  };
-
   const extractRows = (result) => {
     if (Array.isArray(result)) return result;
     if (Array.isArray(result?.data)) return result.data;
-    if (Array.isArray(result?.reports)) return result.reports;
     if (Array.isArray(result?.rows)) return result.rows;
-    if (Array.isArray(result?.data?.reports)) return result.data.reports;
+    if (Array.isArray(result?.reports)) return result.reports;
+    if (Array.isArray(result?.dashboard)) return result.dashboard;
     if (Array.isArray(result?.data?.rows)) return result.data.rows;
+    if (Array.isArray(result?.data?.reports)) return result.data.reports;
+    if (Array.isArray(result?.data?.dashboard)) return result.data.dashboard;
     return [];
+  };
+
+  const removeBadRows = (rows) => {
+    return rows.filter((item) => {
+      if (!item) return false;
+
+      const slNo = clean(getSlNo(item)).toLowerCase();
+      const text = [
+        getDesignation(item),
+        getFunction(item),
+        getEntity(item),
+        getStatus(item),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      if (slNo === "total" || slNo === "grand total") return false;
+      if (text.includes("grand total")) return false;
+
+      return (
+        getDesignation(item) ||
+        getFunction(item) ||
+        getEntity(item) ||
+        getStatus(item) ||
+        getTotalPositions(item) > 0 ||
+        getJoined(item) > 0 ||
+        getYTJ(item) > 0 ||
+        getOpen(item) > 0 ||
+        getHold(item) > 0
+      );
+    });
   };
 
   const loadReports = async () => {
@@ -208,35 +221,33 @@ export default function Reports() {
       setLoading(true);
       setErrorMsg("");
 
-      const urls = [`${API_BASE}/api/sheets/reports`, `${API_BASE}/api/sheets/dashboard`];
-      const res = await fetch("https://talentflow-hr-website-m3yb.onrender.com/api/sheets/dashboard");
-      const result = await res.json();
+      const res = await fetch(`${API_BASE}/api/sheets/dashboard`, {
+        headers: { Accept: "application/json" },
+      });
 
-      let finalRows = [];
+      const text = await res.text();
+      let result = {};
 
-      for (const url of urls) {
-        const res = await fetch(url);
-        const result = await res.json();
-
-        const rows = extractRows(result);
-
-        if (rows.length > 0) {
-          finalRows = rows;
-          break;
-        }
+      try {
+        result = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error("Backend returned invalid JSON.");
       }
 
-      const cleanRows = removeSummaryRows(finalRows);
+      if (!res.ok || result.success === false) {
+        throw new Error(result.error || "Dashboard API failed.");
+      }
 
-      setJobs(cleanRows);
+      const rows = removeBadRows(extractRows(result));
+      setJobs(rows);
 
-      if (cleanRows.length === 0) {
-        setErrorMsg("No reports data found from backend API.");
+      if (rows.length === 0) {
+        setErrorMsg("No Nambiar Builders dashboard data found.");
       }
     } catch (error) {
-      console.log("REPORT LOAD ERROR:", error);
+      console.error("NB DASHBOARD LOAD ERROR:", error);
       setJobs([]);
-      setErrorMsg("Unable to load reports data. Check backend API.");
+      setErrorMsg(error.message || "Unable to load dashboard data.");
     } finally {
       setLoading(false);
     }
@@ -251,11 +262,20 @@ export default function Reports() {
     return ["All Functions", ...Array.from(new Set(list)).sort()];
   }, [jobs]);
 
+  const entities = useMemo(() => {
+    const list = jobs.map(getEntity).filter(Boolean);
+    return ["All Entities", ...Array.from(new Set(list)).sort()];
+  }, [jobs]);
+
   const filteredJobs = useMemo(() => {
     let rows = [...jobs];
 
     if (selectedFunction !== "All Functions") {
       rows = rows.filter((item) => getFunction(item) === selectedFunction);
+    }
+
+    if (selectedEntity !== "All Entities") {
+      rows = rows.filter((item) => getEntity(item) === selectedEntity);
     }
 
     rows = rows.filter((item) =>
@@ -266,24 +286,14 @@ export default function Reports() {
       rows = rows.filter((item) => {
         if (selectedDashboard === "Total Positions")
           return getTotalPositions(item) > 0;
-
         if (selectedDashboard === "Joined") return getJoined(item) > 0;
-
-        if (selectedDashboard === "Offer Accepted") {
-          return (
-            getStatus(item).toLowerCase().includes("offer accepted") ||
-            getYTJ(item) > 0
-          );
-        }
-
         if (selectedDashboard === "Yet to Join") return getYTJ(item) > 0;
         if (selectedDashboard === "Open Number") return getOpen(item) > 0;
         if (selectedDashboard === "On Hold") return getHold(item) > 0;
-        if (selectedDashboard === "Closed by Vendors")
-          return getVendors(item) > 0;
+        if (selectedDashboard === "Closed by Vendors") return getVendors(item) > 0;
+        if (selectedDashboard === "Closed by TA Team") return getTA(item) > 0;
         if (selectedDashboard === "Closed by Internal referral")
           return getInternal(item) > 0;
-        if (selectedDashboard === "Closed by TA Team") return getTA(item) > 0;
 
         return true;
       });
@@ -294,8 +304,10 @@ export default function Reports() {
 
       rows = rows.filter((item) =>
         [
+          getSlNo(item),
           getDesignation(item),
           getFunction(item),
+          getEntity(item),
           getStatus(item),
           getCreatedDate(item),
           getClosedDate(item),
@@ -307,38 +319,37 @@ export default function Reports() {
     }
 
     return rows;
-  }, [jobs, selectedFunction, selectedDashboard, selectedTime, searchText]);
+  }, [
+    jobs,
+    selectedFunction,
+    selectedEntity,
+    selectedDashboard,
+    selectedTime,
+    searchText,
+  ]);
 
   const summary = useMemo(() => {
     return filteredJobs.reduce(
       (acc, item) => {
-        const status = getStatus(item).toLowerCase();
-
         acc.total += getTotalPositions(item);
         acc.joined += getJoined(item);
         acc.ytj += getYTJ(item);
         acc.open += getOpen(item);
         acc.hold += getHold(item);
         acc.vendors += getVendors(item);
-        acc.internal += getInternal(item);
         acc.ta += getTA(item);
-
-        if (status.includes("offer accepted")) {
-          acc.accepted += getYTJ(item) || 1;
-        }
-
+        acc.internal += getInternal(item);
         return acc;
       },
       {
         total: 0,
         joined: 0,
-        accepted: 0,
         ytj: 0,
         open: 0,
         hold: 0,
         vendors: 0,
-        internal: 0,
         ta: 0,
+        internal: 0,
       }
     );
   }, [filteredJobs]);
@@ -351,22 +362,28 @@ export default function Reports() {
       map[fn] = (map[fn] || 0) + getTotalPositions(item);
     });
 
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 12);
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 12);
   }, [filteredJobs]);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: { enabled: true },
+      legend: { display: true },
+    },
+  };
 
   const statusBarData = {
     labels: [
       "Total",
       "Joined",
-      "Accepted",
       "YTJ",
       "Open",
-      "Hold",
+      "On Hold",
       "Vendors",
-      "Internal",
       "TA Team",
+      "Internal",
     ],
     datasets: [
       {
@@ -374,13 +391,12 @@ export default function Reports() {
         data: [
           summary.total,
           summary.joined,
-          summary.accepted,
           summary.ytj,
           summary.open,
           summary.hold,
           summary.vendors,
-          summary.internal,
           summary.ta,
+          summary.internal,
         ],
         backgroundColor: "#16a34a",
         borderRadius: 6,
@@ -391,35 +407,32 @@ export default function Reports() {
   const statusPieData = {
     labels: [
       "Joined",
-      "Offer Accepted",
       "Yet to Join",
       "Open",
       "On Hold",
       "Closed by Vendors",
+      "Closed by TA Team",
       "Internal Referral",
-      "TA Team",
     ],
     datasets: [
       {
         data: [
           summary.joined,
-          summary.accepted,
           summary.ytj,
           summary.open,
           summary.hold,
           summary.vendors,
-          summary.internal,
           summary.ta,
+          summary.internal,
         ],
         backgroundColor: [
           "#22c55e",
-          "#f59e0b",
           "#3b82f6",
           "#f97316",
           "#8b5cf6",
           "#14b8a6",
-          "#ec4899",
           "#06b6d4",
+          "#ec4899",
         ],
         borderWidth: 0,
       },
@@ -438,41 +451,32 @@ export default function Reports() {
     ],
   };
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    events: [],
-    plugins: {
-      tooltip: { enabled: false },
-      legend: { display: true },
-    },
-    animation: { duration: 0 },
-  };
-
   const exportCSV = () => {
     const rows = [
       [
         "Sl No.",
         "Designation",
         "Function",
+        "Entity",
         "Created Date",
         "Closed Date",
         "Status",
         "Total Positions",
         "Joined",
-        "Yet to Join",
+        "Yet to join",
         "Open Number",
         "On Hold",
-        "Closed by Vendors",
-        "Closed by Internal referral",
+        "Closed by vendors",
         "Closed by TA Team",
+        "Closed by Internal referral",
       ],
       ...filteredJobs.map((r) => [
-        getValue(r, ["Sl No.", "Sl No", "S No"]) || "",
+        getSlNo(r),
         getDesignation(r),
         getFunction(r),
-        getCreatedDate(r) || "",
-        getClosedDate(r) || "",
+        getEntity(r),
+        formatDate(getCreatedDate(r)),
+        formatDate(getClosedDate(r)),
         getStatus(r),
         getTotalPositions(r),
         getJoined(r),
@@ -480,20 +484,20 @@ export default function Reports() {
         getOpen(r),
         getHold(r),
         getVendors(r),
-        getInternal(r),
         getTA(r),
+        getInternal(r),
       ]),
     ];
 
     const csv = rows
-      .map((r) =>
-        r.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")
       )
       .join("\n");
 
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = "nb-reports.csv";
+    a.download = "nambiar-builders-dashboard.csv";
     a.click();
   };
 
@@ -528,7 +532,7 @@ export default function Reports() {
       <h1 className="page-title">NB Reports</h1>
 
       <p className="page-subtitle">
-        Live Google Sheets recruitment data from NB Reports.
+        Live Nambiar Builders dashboard recruitment data.
       </p>
 
       <div className="report-filters">
@@ -538,6 +542,18 @@ export default function Reports() {
           onChange={(e) => setSelectedFunction(e.target.value)}
         >
           {functions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="filter-select"
+          value={selectedEntity}
+          onChange={(e) => setSelectedEntity(e.target.value)}
+        >
+          {entities.map((item) => (
             <option key={item} value={item}>
               {item}
             </option>
@@ -681,7 +697,7 @@ export default function Reports() {
 
       <div className="reports-table">
         <div className="table-header">
-          <h3>NB Recruitment Reports</h3>
+          <h3>Nambiar Builders Recruitment Reports</h3>
           <span>{filteredJobs.length} Records</span>
         </div>
 
@@ -692,6 +708,9 @@ export default function Reports() {
                 <th>Sl No.</th>
                 <th>Designation</th>
                 <th>Function</th>
+                <th>Entity</th>
+                <th>Created Date</th>
+                <th>Closed Date</th>
                 <th>Status</th>
                 <th>Total</th>
                 <th>Joined</th>
@@ -699,32 +718,35 @@ export default function Reports() {
                 <th>Open</th>
                 <th>Hold</th>
                 <th>Vendors</th>
-                <th>Internal</th>
                 <th>TA Team</th>
+                <th>Internal</th>
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="12" style={{ textAlign: "center" }}>
+                  <td colSpan="15" style={{ textAlign: "center" }}>
                     Loading...
                   </td>
                 </tr>
               ) : filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan="12" style={{ textAlign: "center" }}>
+                  <td colSpan="15" style={{ textAlign: "center" }}>
                     No data found
                   </td>
                 </tr>
               ) : (
                 filteredJobs.map((r, index) => (
                   <tr key={index}>
-                    <td>{getValue(r, ["Sl No.", "Sl No", "S No"])}</td>
+                    <td>{getSlNo(r)}</td>
                     <td>
                       <strong>{getDesignation(r)}</strong>
                     </td>
                     <td>{getFunction(r)}</td>
+                    <td>{getEntity(r)}</td>
+                    <td>{formatDate(getCreatedDate(r))}</td>
+                    <td>{formatDate(getClosedDate(r))}</td>
                     <td>{getStatus(r)}</td>
                     <td>{getTotalPositions(r)}</td>
                     <td>{getJoined(r)}</td>
@@ -732,8 +754,8 @@ export default function Reports() {
                     <td>{getOpen(r)}</td>
                     <td>{getHold(r)}</td>
                     <td>{getVendors(r)}</td>
-                    <td>{getInternal(r)}</td>
                     <td>{getTA(r)}</td>
+                    <td>{getInternal(r)}</td>
                   </tr>
                 ))
               )}
