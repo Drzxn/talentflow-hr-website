@@ -14,27 +14,40 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-/* ==============================
-   CORS
-============================== */
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5000",
+  "https://talent-hr.netlify.app",
+  "https://talentflow-hr-website-1jga.onrender.com",
+  "https://talentflow-hr-website-1.onrender.com",
+  "https://talentflow-hr-website.onrender.com",
+  "https://talentflow-hr-website-m3yb.onrender.com",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: true,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
     credentials: true,
   })
 );
 
-/* ==============================
-   BODY PARSER
-============================== */
-
 app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-/* ==============================
-   ROOT ROUTES
-============================== */
+function mountRoute(path, route) {
+  if (typeof route !== "function") {
+    throw new Error(`Route import is invalid: ${path}`);
+  }
+
+  app.use(path, route);
+}
 
 app.get("/", (req, res) => {
   res.json({
@@ -52,20 +65,25 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-/* ==============================
-   MAIN ROUTES
-============================== */
+app.get("/api/env-check", (req, res) => {
+  res.json({
+    success: true,
+    GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID ? "SET" : "MISSING",
+    GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+      ? "SET"
+      : "MISSING",
+    SUBMISSION_RANGE: process.env.SUBMISSION_RANGE || "MISSING",
+    INTERNSHIP_RANGE: process.env.INTERNSHIP_RANGE || "MISSING",
+    OFFER_RANGE: process.env.OFFER_RANGE || "MISSING",
+  });
+});
 
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/sheets", googleSheetRoutes);
-app.use("/api/hospitality", hospitalityRoutes);
-
-/* ==============================
-   TEST ROUTES
-============================== */
+mountRoute("/api/auth", authRoutes);
+mountRoute("/api/users", userRoutes);
+mountRoute("/api/dashboard", dashboardRoutes);
+mountRoute("/api/reports", reportRoutes);
+mountRoute("/api/sheets", googleSheetRoutes);
+mountRoute("/api/hospitality", hospitalityRoutes);
 
 app.get("/api/test", (req, res) => {
   res.json({
@@ -90,10 +108,6 @@ app.get("/api/test-sheets", (req, res) => {
   });
 });
 
-/* ==============================
-   404 HANDLER
-============================== */
-
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -102,18 +116,21 @@ app.use((req, res) => {
   });
 });
 
-/* ==============================
-   SERVER START
-============================== */
+app.use((error, req, res, next) => {
+  console.error("SERVER ERROR:", error);
+
+  res.status(500).json({
+    success: false,
+    error: error.message || "Internal server error",
+  });
+});
 
 app.listen(PORT, () => {
   console.log("=================================");
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Local: http://localhost:${PORT}`);
   console.log(`✅ Health: http://localhost:${PORT}/api/health`);
+  console.log(`✅ Env Check: http://localhost:${PORT}/api/env-check`);
   console.log(`✅ Sheets: http://localhost:${PORT}/api/sheets`);
-  console.log(`✅ Offers: http://localhost:${PORT}/api/sheets/offers`);
-  console.log(`✅ Internships: http://localhost:${PORT}/api/sheets/internships`);
-  console.log(`✅ Submissions: http://localhost:${PORT}/api/sheets/submissions`);
   console.log("=================================");
 });
