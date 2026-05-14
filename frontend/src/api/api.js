@@ -1,3 +1,4 @@
+
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/$/, "");
@@ -32,6 +33,17 @@ function cleanEndpoint(endpoint = "") {
 async function fetchAPI(endpoint) {
   const cleanPath = cleanEndpoint(endpoint);
 
+
+  const res = await fetch(
+    "https://talentflow-hr-website-1jga.onrender.com/api/sheets/dashboard"
+  );
+
+  const API_URL =
+    import.meta.env.VITE_API_URL ||
+    "https://talentflow-hr-website-m3yb.onrender.com";
+
+
+
   try {
     const response = await fetch(`${API_URL}${cleanPath}`, {
       method: "GET",
@@ -55,8 +67,8 @@ async function fetchAPI(endpoint) {
     if (!response.ok) {
       throw new Error(
         result.error ||
-          result.message ||
-          `Backend request failed (${response.status})`
+        result.message ||
+        `Backend request failed (${response.status})`
       );
     }
 

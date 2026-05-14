@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_BASE =
   import.meta.env.VITE_API_URL ||
@@ -6,6 +6,7 @@ const API_BASE =
 
 export default function HospitalityReports() {
   const [rows, setRows] = useState([]);
+  const didLoad = useRef(false);
   const [search, setSearch] = useState("");
   const [selectedFunction, setSelectedFunction] =
     useState("All Functions");
@@ -21,6 +22,11 @@ export default function HospitalityReports() {
         `${API_BASE}/api/hospitality/dashboard`
       );
 
+
+
+
+
+
       const result = await res.json();
 
       setRows(Array.isArray(result.data) ? result.data : []);
@@ -33,14 +39,18 @@ export default function HospitalityReports() {
   };
 
   useEffect(() => {
-    loadReports();
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
+    loadHospitalityReports();
   }, []);
 
   const getFunctionName = (item) =>
     String(
       item["Function"] ||
-        item["Department"] ||
-        "Unknown"
+      item["Department"] ||
+      "Unknown"
     ).trim();
 
   const getDateValue = (item) => {
@@ -336,11 +346,10 @@ export default function HospitalityReports() {
                       <div
                         style={{
                           ...styles.barFill,
-                          width: `${
-                            (item.count /
+                          width: `${(item.count /
                               maxCount) *
                             100
-                          }%`,
+                            }%`,
                         }}
                       />
                     </div>

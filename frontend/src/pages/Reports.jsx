@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -48,6 +48,7 @@ const TIME_FILTERS = [
 
 export default function Reports() {
   const [jobs, setJobs] = useState([]);
+  const didLoad = useRef(false);
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
   const [selectedEntity, setSelectedEntity] = useState("All Entities");
   const [selectedDashboard, setSelectedDashboard] = useState("All Dashboard");
@@ -221,9 +222,16 @@ export default function Reports() {
       setLoading(true);
       setErrorMsg("");
 
+
       const res = await fetch(`${API_BASE}/api/sheets/dashboard`, {
         headers: { Accept: "application/json" },
       });
+
+      const urls = [`${API_BASE}/api/sheets/reports`, `${API_BASE}/api/sheets/dashboard`];
+
+
+
+
 
       const text = await res.text();
       let result = {};
@@ -254,6 +262,10 @@ export default function Reports() {
   };
 
   useEffect(() => {
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
     loadReports();
   }, []);
 

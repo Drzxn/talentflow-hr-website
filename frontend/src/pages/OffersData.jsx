@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 
 const RAW_API_BASE =
@@ -19,11 +19,13 @@ const OFFER_COLUMNS = [
 
 export default function OffersData() {
   const [rows, setRows] = useState([]);
+  const didLoad = useRef(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
 
   const cleanText = (value) => String(value || "").trim();
+
 
   const normalizeText = (value) =>
     cleanText(value).toLowerCase().replace(/\s+/g, " ");
@@ -31,7 +33,15 @@ export default function OffersData() {
   const getValueByKey = (item, key) => {
     const matchedKey = Object.keys(item || {}).find(
       (k) => normalizeText(k) === normalizeText(key)
-    );
+
+  const getStatus = (item) =>
+      cleanText(
+        item["Status"] ||
+        item["Offer Status"] ||
+        item["Offers Status"] ||
+        item["OfferStatus"]
+
+      );
 
     return matchedKey ? item[matchedKey] : "";
   };
@@ -114,8 +124,8 @@ export default function OffersData() {
       if (!res.ok || result.success === false) {
         throw new Error(
           result.error ||
-            result.message ||
-            `Backend request failed (${res.status})`
+          result.message ||
+          `Backend request failed (${res.status})`
         );
       }
 
@@ -142,7 +152,11 @@ export default function OffersData() {
   };
 
   useEffect(() => {
-    loadOffersData();
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
+    loadOffers();
   }, []);
 
   const filteredRows = useMemo(() => {

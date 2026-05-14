@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 
 const RAW_API_BASE =
@@ -14,11 +14,13 @@ const COLUMNS = ["Total", "Joined"];
 
 export default function InternshipData() {
   const [rows, setRows] = useState([]);
+  const didLoad = useRef(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
 
   const cleanText = (value) => String(value || "").trim();
+
 
   const normalizeText = (value) =>
     cleanText(value).toLowerCase().replace(/\s+/g, " ");
@@ -26,7 +28,14 @@ export default function InternshipData() {
   const getValueByKey = (item, key) => {
     const matchedKey = Object.keys(item || {}).find(
       (k) => normalizeText(k) === normalizeText(key)
-    );
+
+  const getStatus = (item) =>
+      cleanText(
+        item["Status"] ||
+        item["Internship Status"] ||
+        item["Joining Status"]
+
+      );
 
     return matchedKey ? item[matchedKey] : "";
   };
@@ -107,8 +116,8 @@ export default function InternshipData() {
       if (!res.ok || result.success === false) {
         throw new Error(
           result.error ||
-            result.message ||
-            `Backend request failed (${res.status})`
+          result.message ||
+          `Backend request failed (${res.status})`
         );
       }
 
@@ -135,7 +144,11 @@ export default function InternshipData() {
   };
 
   useEffect(() => {
-    loadInternshipData();
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
+    loadInternships();
   }, []);
 
   const filteredRows = useMemo(() => {
