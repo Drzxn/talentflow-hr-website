@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 import { Bar, Doughnut } from "react-chartjs-2";
 
@@ -147,6 +147,7 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
+  const didLoad = useRef(false);
 
   const toNumber = (value) => {
     const num = Number(String(value || "0").replace(/,/g, ""));
@@ -328,6 +329,10 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
     loadDashboard();
   }, []);
 

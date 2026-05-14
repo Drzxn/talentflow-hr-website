@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function HospitalityReports() {
   const [rows, setRows] = useState([]);
+  const didLoad = useRef(false);
   const [search, setSearch] = useState("");
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
   const [timeFilter, setTimeFilter] = useState("All Time");
@@ -29,7 +30,11 @@ export default function HospitalityReports() {
   };
 
   useEffect(() => {
-    loadReports();
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
+    loadHospitalityReports();
   }, []);
 
   const getFunctionName = (item) =>

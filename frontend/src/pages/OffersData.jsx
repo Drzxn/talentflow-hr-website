@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 
 const API_BASE =
@@ -15,6 +15,7 @@ const OFFER_STATUS_OPTIONS = [
 
 export default function OffersData() {
   const [rows, setRows] = useState([]);
+  const didLoad = useRef(false);
   const [loading, setLoading] = useState(true);
 
   const cleanText = (value) => String(value || "").trim();
@@ -22,9 +23,9 @@ export default function OffersData() {
   const getStatus = (item) =>
     cleanText(
       item["Status"] ||
-        item["Offer Status"] ||
-        item["Offers Status"] ||
-        item["OfferStatus"]
+      item["Offer Status"] ||
+      item["Offers Status"] ||
+      item["OfferStatus"]
     );
 
   const loadOffersData = async () => {
@@ -44,7 +45,11 @@ export default function OffersData() {
   };
 
   useEffect(() => {
-    loadOffersData();
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
+    loadOffers();
   }, []);
 
   const statusCounts = useMemo(() => {

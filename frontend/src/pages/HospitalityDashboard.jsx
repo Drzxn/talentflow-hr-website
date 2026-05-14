@@ -30,6 +30,7 @@ const DEFAULT_ENTITIES = ["NB Club Bellezea", "Chalukya Samrat"];
 
 export default function HospitalityDashboard() {
   const [rows, setRows] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
 

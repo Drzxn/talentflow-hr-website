@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -48,6 +48,7 @@ const TIME_FILTERS = [
 
 export default function Reports() {
   const [jobs, setJobs] = useState([]);
+  const didLoad = useRef(false);
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
   const [selectedDashboard, setSelectedDashboard] = useState("All Dashboard");
   const [selectedTime, setSelectedTime] = useState("All Time");
@@ -245,6 +246,10 @@ export default function Reports() {
   };
 
   useEffect(() => {
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
     loadReports();
   }, []);
 

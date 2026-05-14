@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 
 const API_BASE =
@@ -7,6 +7,7 @@ const API_BASE =
 
 export default function InternshipData() {
   const [rows, setRows] = useState([]);
+  const didLoad = useRef(false);
   const [loading, setLoading] = useState(true);
 
   const cleanText = (value) => String(value || "").trim();
@@ -14,8 +15,8 @@ export default function InternshipData() {
   const getStatus = (item) =>
     cleanText(
       item["Status"] ||
-        item["Internship Status"] ||
-        item["Joining Status"]
+      item["Internship Status"] ||
+      item["Joining Status"]
     );
 
   const loadInternshipData = async () => {
@@ -35,7 +36,11 @@ export default function InternshipData() {
   };
 
   useEffect(() => {
-    loadInternshipData();
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
+    loadInternships();
   }, []);
 
   const summary = useMemo(() => {
