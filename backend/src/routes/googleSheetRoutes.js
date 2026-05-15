@@ -8,6 +8,9 @@ const router = express.Router();
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
 
+const CACHE = new Map();
+
+const CACHE_DURATION = 60 * 1000; // 1 minute
 /* =========================
    GOOGLE AUTH
 ========================= */
@@ -118,8 +121,25 @@ async function readSheet({ spreadsheetId, ranges }) {
     throw new Error("Spreadsheet ID is missing in environment variables");
   }
 
+  const cacheKey = `${spreadsheetId}-${ranges.join(",")}`;
+
+  const cached = CACHE.get(cacheKey);
+
+  // Return cached data if valid
+  if (
+    cached &&
+    Date.now() - cached.timestamp < CACHE_DURATION
+  ) {
+    console.log("Serving from cache:", cacheKey);
+
+    return cached.data;
+  }
+
   const sheets = await getSheetsClient();
-  const availableTabs = await getAvailableTabs({ sheets, spreadsheetId });
+  const availableTabs = await getAvailableTabs({
+    sheets,
+    spreadsheetId,
+  });
 
   let finalRange = "";
   let values = [];
@@ -149,13 +169,20 @@ async function readSheet({ spreadsheetId, ranges }) {
 
   const data = rowsToJson(values);
 
-  return {
+  const result = {
     sheetName: finalRange,
     total: data.length,
     data,
   };
-}
 
+  // Save to cache
+  CACHE.set(cacheKey, {
+    timestamp: Date.now(),
+    data: result,
+  });
+
+  return result;
+}
 /* =========================
    ROOT
 ========================= */
