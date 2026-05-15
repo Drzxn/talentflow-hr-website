@@ -4,14 +4,32 @@ import { google } from "googleapis";
 const router = express.Router();
 
 function getGoogleAuth() {
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_FILE) {
+  const rawJson =
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
+
+  if (rawJson) {
+    const credentials = JSON.parse(rawJson);
+
     return new google.auth.GoogleAuth({
-      keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+      credentials,
+      scopes: [
+        "https://www.googleapis.com/auth/spreadsheets.readonly",
+      ],
     });
   }
 
-  throw new Error("GOOGLE_SERVICE_ACCOUNT_FILE is missing in .env");
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_FILE) {
+    return new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
+      scopes: [
+        "https://www.googleapis.com/auth/spreadsheets.readonly",
+      ],
+    });
+  }
+
+  throw new Error(
+    "Google credentials missing in .env"
+  );
 }
 
 router.get("/dashboard", async (req, res) => {
