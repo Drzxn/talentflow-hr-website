@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 import { Bar, Doughnut } from "react-chartjs-2";
 
@@ -16,13 +17,74 @@ const API_URL =
   import.meta.env.VITE_API_URL ||
   "https://talentflow-hr-website-1jga.onrender.com";
 
+const valueLabelPlugin = {
+  id: "valueLabelPlugin",
+
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+
+    ctx.save();
+
+    chart.data.datasets.forEach((dataset, datasetIndex) => {
+      const meta = chart.getDatasetMeta(datasetIndex);
+
+      meta.data.forEach((element, index) => {
+        const value = Number(dataset.data[index] || 0);
+
+        if (value <= 0) return;
+
+        ctx.font = "700 12px Inter, Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        if (chart.config.type === "bar") {
+          const position = element.tooltipPosition();
+
+          ctx.fillStyle = "#111827";
+          ctx.fillText(value, position.x, position.y - 10);
+        }
+
+        if (chart.config.type === "doughnut") {
+          const props = element.getProps(
+            [
+              "x",
+              "y",
+              "startAngle",
+              "endAngle",
+              "innerRadius",
+              "outerRadius",
+            ],
+            true
+          );
+
+          const angle = (props.startAngle + props.endAngle) / 2;
+          const radius = (props.innerRadius + props.outerRadius) / 2;
+
+          const x = props.x + Math.cos(angle) * radius;
+          const y = props.y + Math.sin(angle) * radius;
+
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = "#111827";
+          ctx.fillStyle = "#ffffff";
+
+          ctx.strokeText(value, x, y);
+          ctx.fillText(value, x, y);
+        }
+      });
+    });
+
+    ctx.restore();
+  },
+};
+
 ChartJS.register(
   BarElement,
   ArcElement,
   CategoryScale,
   LinearScale,
   Tooltip,
-  Legend
+  Legend,
+  valueLabelPlugin
 );
 
 const ENTITIES = [
@@ -85,6 +147,7 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
+  const didLoad = useRef(false);
 
   const toNumber = (value) => {
     const num = Number(String(value || "0").replace(/,/g, ""));
@@ -118,22 +181,31 @@ export default function Dashboard() {
     if (!value) return null;
 
     const normalDate = new Date(value);
-    if (!Number.isNaN(normalDate.getTime())) return normalDate;
+
+    if (!Number.isNaN(normalDate.getTime())) {
+      return normalDate;
+    }
 
     if (typeof value === "string" && value.includes("-")) {
       const parts = value.split("-");
+
       if (parts.length === 3) {
         const [dd, mm, yyyy] = parts;
+
         const d = new Date(`${yyyy}-${mm}-${dd}`);
+
         if (!Number.isNaN(d.getTime())) return d;
       }
     }
 
     if (typeof value === "string" && value.includes("/")) {
       const parts = value.split("/");
+
       if (parts.length === 3) {
         const [dd, mm, yyyy] = parts;
+
         const d = new Date(`${yyyy}-${mm}-${dd}`);
+
         if (!Number.isNaN(d.getTime())) return d;
       }
     }
@@ -141,24 +213,31 @@ export default function Dashboard() {
     return null;
   };
 
-  const getRowDate = (item) =>
-    parseDate(item["Date"]) ||
-    parseDate(item["Created Date"]) ||
-    parseDate(item["Created At"]) ||
-    parseDate(item["Requirement Date"]) ||
-    parseDate(item["Open Date"]) ||
-    parseDate(item["Joining Date"]) ||
-    parseDate(item["Joined Date"]);
+  const getRowDate = (item) => {
+    return (
+      parseDate(item["Date"]) ||
+      parseDate(item["Created Date"]) ||
+      parseDate(item["Created At"]) ||
+      parseDate(item["Requirement Date"]) ||
+      parseDate(item["Open Date"]) ||
+      parseDate(item["Joining Date"]) ||
+      parseDate(item["Joined Date"])
+    );
+  };
 
   const startOfDay = (date) => {
     const d = new Date(date);
+
     d.setHours(0, 0, 0, 0);
+
     return d;
   };
 
   const endOfDay = (date) => {
     const d = new Date(date);
+
     d.setHours(23, 59, 59, 999);
+
     return d;
   };
 
@@ -166,6 +245,7 @@ export default function Dashboard() {
     if (selectedTime === "All Time") return true;
 
     const rowDate = getRowDate(item);
+
     if (!rowDate) return false;
 
     const today = new Date();
@@ -181,7 +261,9 @@ export default function Dashboard() {
 
     if (selectedTime === "Yesterday") {
       const y = new Date(today);
+
       y.setDate(y.getDate() - 1);
+
       from = startOfDay(y);
       to = endOfDay(y);
     }
@@ -190,6 +272,7 @@ export default function Dashboard() {
       const d = new Date(today);
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+
       from = startOfDay(new Date(d.setDate(diff)));
       to = endOfDay(today);
     }
@@ -212,6 +295,7 @@ export default function Dashboard() {
 
     if (selectedTime === "Custom Range") {
       if (!customFrom || !customTo) return true;
+
       from = startOfDay(new Date(customFrom));
       to = endOfDay(new Date(customTo));
     }
@@ -225,6 +309,7 @@ export default function Dashboard() {
       setApiError("");
 
       const res = await fetch(`${API_URL}/api/sheets/dashboard`);
+
       const result = await res.json();
 
       if (!res.ok) {
@@ -244,6 +329,10 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (didLoad.current) return;
+
+    didLoad.current = true;
+
     loadDashboard();
   }, []);
 
@@ -261,7 +350,14 @@ export default function Dashboard() {
     }
 
     return rows.filter(isInsideTimeFilter);
-  }, [jobs, selectedEntity, selectedFunction, selectedTime, customFrom, customTo]);
+  }, [
+    jobs,
+    selectedEntity,
+    selectedFunction,
+    selectedTime,
+    customFrom,
+    customTo,
+  ]);
 
   const summary = useMemo(() => {
     return filteredJobs.reduce(
@@ -270,25 +366,36 @@ export default function Dashboard() {
 
         acc.closed += toNumber(
           item["Closed"] ||
-            item["Joined"] ||
-            item["Total Closed"] ||
-            item["Closed Positions"]
+          item["Joined"] ||
+          item["Total Closed"] ||
+          item["Closed Positions"]
         );
 
         acc.ytj += toNumber(item["Yet to join"]);
         acc.open += toNumber(item["Open Number"]);
         acc.hold += toNumber(item["On Hold"]);
         acc.closedByVendors += toNumber(item["Closed by vendors"]);
+
         acc.closedByInternalReferral += toNumber(
           item["Closed by Internal referral"]
         );
+
         acc.closedByTATeam += toNumber(item["Closed by TA Team"]);
+
+        const status = String(item["Status"] || "")
+          .trim()
+          .toLowerCase();
+
+        if (status.includes("offer accepted")) {
+          acc.accepted += toNumber(item["Yet to join"]) || 1;
+        }
 
         return acc;
       },
       {
         total: 0,
         closed: 0,
+        accepted: 0,
         ytj: 0,
         open: 0,
         hold: 0,
@@ -302,17 +409,18 @@ export default function Dashboard() {
   const cards = [
     ["Total Positions", summary.total, "From selected filters", "c1"],
     ["Closed", summary.closed, "Live sheet count", "c2"],
-    ["Yet to Join", summary.ytj, "Pending joining", "c3"],
-    ["Open Number", summary.open, "Current openings", "c4"],
-    ["On Hold", summary.hold, "Hold positions", "c5"],
-    ["Closed by Vendors", summary.closedByVendors, "Vendor closed", "c6"],
+    ["Offer Accepted", summary.accepted, "Accepted candidates", "c3"],
+    ["Yet to Join", summary.ytj, "Pending joining", "c4"],
+    ["Open Number", summary.open, "Current openings", "c5"],
+    ["On Hold", summary.hold, "Hold positions", "c6"],
+    ["Closed by Vendors", summary.closedByVendors, "Vendor closed", "c7"],
     [
       "Closed by Internal referral",
       summary.closedByInternalReferral,
       "Internal referral closure",
-      "c7",
+      "c8",
     ],
-    ["Closed by TA Team", summary.closedByTATeam, "TA team closure", "c8"],
+    ["Closed by TA Team", summary.closedByTATeam, "TA team closure", "c1"],
   ];
 
   const functionSummary = useMemo(() => {
@@ -320,10 +428,13 @@ export default function Dashboard() {
 
     filteredJobs.forEach((item) => {
       const fn = String(item["Function"] || "Unknown").trim();
+
       map[fn] = (map[fn] || 0) + toNumber(item["Total Positions"]);
     });
 
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
   }, [filteredJobs]);
 
   const entitySummary = useMemo(() => {
@@ -331,6 +442,7 @@ export default function Dashboard() {
 
     filteredJobs.forEach((item) => {
       const entity = getEntity(item);
+
       map[entity] = (map[entity] || 0) + toNumber(item["Total Positions"]);
     });
 
@@ -339,11 +451,13 @@ export default function Dashboard() {
 
   const barData = {
     labels: functionSummary.map(([name]) => name),
+
     datasets: [
       {
         label: "Total Positions",
         data: functionSummary.map(([, value]) => value),
         backgroundColor: "#16a34a",
+        hoverBackgroundColor: "#16a34a",
         borderRadius: 8,
       },
     ],
@@ -351,11 +465,13 @@ export default function Dashboard() {
 
   const entityBarData = {
     labels: entitySummary.map(([name]) => name),
+
     datasets: [
       {
         label: "Entity Positions",
         data: entitySummary.map(([, value]) => value),
         backgroundColor: "#22c55e",
+        hoverBackgroundColor: "#22c55e",
         borderRadius: 8,
       },
     ],
@@ -371,6 +487,7 @@ export default function Dashboard() {
       "Internal Referral",
       "TA Team",
     ],
+
     datasets: [
       {
         data: [
@@ -382,6 +499,7 @@ export default function Dashboard() {
           summary.closedByInternalReferral,
           summary.closedByTATeam,
         ],
+
         backgroundColor: [
           "#22c55e",
           "#f59e0b",
@@ -391,7 +509,19 @@ export default function Dashboard() {
           "#14b8a6",
           "#ec4899",
         ],
+
+        hoverBackgroundColor: [
+          "#22c55e",
+          "#f59e0b",
+          "#3b82f6",
+          "#f97316",
+          "#8b5cf6",
+          "#14b8a6",
+          "#ec4899",
+        ],
+
         borderWidth: 0,
+        hoverOffset: 0,
       },
     ],
   };
@@ -399,57 +529,122 @@ export default function Dashboard() {
   const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 0 },
+    events: [],
+
     plugins: {
-      tooltip: { enabled: false },
-      legend: { display: true },
+      tooltip: {
+        enabled: false,
+      },
+
+      legend: {
+        display: true,
+      },
+    },
+
+    animation: {
+      duration: 0,
     },
   };
 
   const barOptions = {
     ...commonOptions,
-    plugins: {
-      tooltip: { enabled: false },
-      legend: { display: false },
+
+    layout: {
+      padding: {
+        top: 28,
+      },
     },
+
+    plugins: {
+      tooltip: {
+        enabled: false,
+      },
+
+      legend: {
+        display: false,
+      },
+    },
+
     scales: {
       x: {
-        grid: { display: false },
-        ticks: { font: { size: 10 } },
+        ticks: {
+          font: {
+            size: 10,
+          },
+        },
+
+        grid: {
+          display: false,
+        },
       },
+
       y: {
         beginAtZero: true,
-        ticks: { precision: 0, font: { size: 10 } },
+        grace: "15%",
+
+        ticks: {
+          precision: 0,
+
+          font: {
+            size: 10,
+          },
+        },
       },
     },
   };
 
   const entityBarOptions = {
     ...barOptions,
+
     indexAxis: "y",
+
     scales: {
       x: {
         beginAtZero: true,
-        ticks: { precision: 0, font: { size: 10 } },
+        grace: "15%",
+
+        ticks: {
+          precision: 0,
+          font: {
+            size: 10,
+          },
+        },
       },
+
       y: {
-        grid: { display: false },
-        ticks: { font: { size: 10 } },
+        ticks: {
+          font: {
+            size: 10,
+          },
+        },
+
+        grid: {
+          display: false,
+        },
       },
     },
   };
 
   const doughnutOptions = {
     ...commonOptions,
+
     cutout: "68%",
+
     plugins: {
-      tooltip: { enabled: false },
+      tooltip: {
+        enabled: false,
+      },
+
       legend: {
         position: "bottom",
+
         labels: {
           boxWidth: 12,
           padding: 12,
-          font: { size: 11 },
+
+          font: {
+            size: 11,
+          },
         },
       },
     },

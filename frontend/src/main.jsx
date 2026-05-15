@@ -9,8 +9,8 @@ import "./styles/dashboard.css";
 import "./styles/reports.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-    <Toaster position="top-right" />
-  </React.StrictMode>
+
+  <App />
+
+
 );
